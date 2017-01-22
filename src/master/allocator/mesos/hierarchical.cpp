@@ -17,6 +17,7 @@
 #include "master/allocator/mesos/hierarchical.hpp"
 
 #include <algorithm>
+#include <complex>
 #include <set>
 #include <string>
 #include <vector>
@@ -39,7 +40,7 @@
 using std::set;
 using std::string;
 using std::vector;
-
+using std::complex;
 using mesos::allocator::InverseOfferStatus;
 
 using process::Failure;
@@ -119,6 +120,75 @@ private:
   const Timeout timeout;
 };
 
+
+class ComplexResourcesRepresentation
+{
+public:
+  ComplexResourcesRepresentation(
+      HierarchicalAllocatorProcess* process,
+      SlaveID slaveId)
+  {
+    // FIXME returns should be exceptions!
+    Option<double> totalCpu = process->slaves[slaveId].total.cpus();
+    if (totalCpu.isNone())
+      return;
+
+    Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
+    if (totalMem.isNone())
+      return;
+
+    double availableCpu = totalCpu.get();
+    Option<double> allocatedCpu = process->slaves[slaveId].allocated.cpus();
+    if (allocatedCpu.isSome())
+      availableCpu = totalCpu.get() - allocatedCpu.get();
+
+    uint64_t totalMemMB = totalMem.get().megabytes();
+    uint64_t allocatedMemMB = 0;
+    uint64_t availableMemMB = totalMemMB;
+    Option<Bytes> allocatedMem = process->slaves[slaveId].allocated.mem();
+    if (allocatedMem.isSome()) {
+      allocatedMemMB = allocatedMem.get().megabytes();
+      availableMemMB = totalMemMB - allocatedMemMB;
+    }
+
+    double availablePercentageCpu = availableCpu / totalCpu.get();
+    // FIXME possible issue if not casting also the dividend?
+    double availablePercentageMem =
+      availableMemMB / static_cast<double>(totalMemMB);
+
+    this->complexResources =
+      complex<double> (availablePercentageCpu, availablePercentageMem);
+    this->resourcesSlaveID = slaveId;
+
+    // LOG messages. TODO remove
+    VLOG(0) << "total cpu=" << totalCpu.get();
+    if (allocatedCpu.isSome())
+      VLOG(0) << "allocated cpu=" << allocatedCpu.get();
+    else
+      VLOG(0) << "allocated cpu=" << 0;
+    VLOG(0) << "available cpu=" << availableCpu;
+
+    VLOG(0) << "total mem=" << totalMemMB;
+    VLOG(0) << "allocated mem=" << allocatedMemMB;
+    VLOG(0) << "available mem=" << availableMemMB;
+
+    VLOG(0) << "created complexResourcesRepresentation: "
+            << complexResources;
+  }
+
+private:
+  complex<double> complexResources;
+  SlaveID resourcesSlaveID;
+};
+
+void HierarchicalAllocatorProcess::blindSort(vector<SlaveID>& slaveIds)
+{
+    VLOG(0) << "EXECUTING BLINDSORT";
+    if(slaveIds.size() > 0)
+        ComplexResourcesRepresentation cRR(this, slaveIds[0]);
+    else
+        VLOG(0) << "No slave from which to take resources from...";
+}
 
 void HierarchicalAllocatorProcess::initialize(
     const Duration& _allocationInterval,
@@ -1343,6 +1413,8 @@ void HierarchicalAllocatorProcess::allocate(
   //
   // TODO(vinod): Implement a smarter sorting algorithm.
   std::random_shuffle(slaveIds.begin(), slaveIds.end());
+
+  blindSort(slaveIds);
 
   // Returns the __quantity__ of resources allocated to a quota role. Since we
   // account for reservations and persistent volumes toward quota, we strip

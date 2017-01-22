@@ -64,12 +64,15 @@ namespace internal {
 // Forward declarations.
 class OfferFilter;
 class InverseOfferFilter;
+class ComplexResourcesRepresentation;
 
 
 // Implements the basic allocator algorithm - first pick a role by
 // some criteria, then pick one of their frameworks to allocate to.
 class HierarchicalAllocatorProcess : public MesosAllocatorProcess
 {
+friend class ComplexResourcesRepresentation;
+
 public:
   HierarchicalAllocatorProcess(
       const std::function<Sorter*()>& roleSorterFactory,
@@ -203,6 +206,9 @@ protected:
   // Useful typedefs for dispatch/delay/defer to self()/this.
   typedef HierarchicalAllocatorProcess Self;
   typedef HierarchicalAllocatorProcess This;
+
+  // Blind sorting of slaves
+  void blindSort(std::vector<SlaveID>& slaveIds);
 
   // Idempotent helpers for pausing and resuming allocation.
   void pause();
