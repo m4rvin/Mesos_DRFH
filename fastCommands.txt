@@ -1,0 +1,23 @@
+
+#CONFIGURE, COMPILE AND INSTALL
+
+./bootstrap
+mkdir build && cd build
+
+../configure --prefix=/opt/mesos --disable-python --disable-java
+
+make -j2
+
+make check -j2
+
+make install -j2 DESTDIR=/home/m4rvin/mesos_drfh/build/RUNNABLE
+
+
+
+#EXECUTION (LOCAL)
+
+./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog
+
+./mesos-agent.sh --master=127.0.0.1:5050 --work_dir=/tmp/mesos --no-systemd_enable_support --log_dir=/tmp/mesosLog
+
+./test-framework --master=127.0.0.1:5050
