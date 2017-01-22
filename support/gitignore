@@ -33,3 +33,7 @@ missing
 .deps/
 .libs/
 *-stamp
+
+# IDE generated files
+.cproject
+.project
