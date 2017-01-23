@@ -37,3 +37,4 @@ missing
 # IDE generated files
 .cproject
 .project
+.settings/*
