@@ -128,20 +128,21 @@ public:
       HierarchicalAllocatorProcess* process,
       SlaveID slaveId)
   {
-    // FIXME returns should be exceptions!
+    // retrieve total cpu capacity from a slave
     Option<double> totalCpu = process->slaves[slaveId].total.cpus();
-    if (totalCpu.isNone())
-      return;
+    CHECK_SOME(totalCpu);
 
+    // retrieve total mem capacity from a slave
     Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
-    if (totalMem.isNone())
-      return;
+    CHECK_SOME(totalMem);
 
+    // update available and allocated cpu amount for that slave
     double availableCpu = totalCpu.get();
     Option<double> allocatedCpu = process->slaves[slaveId].allocated.cpus();
     if (allocatedCpu.isSome())
       availableCpu = totalCpu.get() - allocatedCpu.get();
 
+    // update available and allocated mem(MB) amount for that slave
     uint64_t totalMemMB = totalMem.get().megabytes();
     uint64_t allocatedMemMB = 0;
     uint64_t availableMemMB = totalMemMB;
