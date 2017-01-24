@@ -177,18 +177,55 @@ public:
             << complexResources;
   }
 
+  static bool complexResourceIsBalanced(
+      ComplexResourcesRepresentation complexRR)
+  {
+    CHECK_LE(complexRR.complexResources.real(), 1.0);
+    CHECK_LE(complexRR.complexResources.imag(), 1.0);
+
+    if(complexRR.checkUpperBound() && complexRR.checkLowerBound())
+      return true;
+    return false;
+  }
+
 private:
   complex<double> complexResources;
   SlaveID resourcesSlaveID;
+
+  bool checkUpperBound()
+  {
+    double real = this->complexResources.real();
+    if(real >= 0.9) return true;
+    double imag = this->complexResources.imag();
+    double upperBoundValue = (10.0/9.0) * real;
+    if(imag > upperBoundValue) return false;
+    return true;
+  }
+
+  bool checkLowerBound()
+  {
+    double imag = this->complexResources.imag();
+    if(imag >= 0.9) return true;
+    double real = this->complexResources.real();
+    double lowerBoundValue = (9.0/10.0) * real;
+    if(imag < lowerBoundValue) return false;
+    return true;
+  }
 };
 
 void HierarchicalAllocatorProcess::blindSort(vector<SlaveID>& slaveIds)
 {
     VLOG(0) << "EXECUTING BLINDSORT";
-    if(slaveIds.size() > 0)
-        ComplexResourcesRepresentation cRR(this, slaveIds[0]);
+    if (slaveIds.size() > 0)
+    {
+      ComplexResourcesRepresentation complexRR(this, slaveIds[0]);
+      if (ComplexResourcesRepresentation::complexResourceIsBalanced(complexRR))
+        VLOG(0) << "RESOURCE is balanced";
+      else
+        VLOG(0) << "RESOURCE is NOT balanced";
+    }
     else
-        VLOG(0) << "No slave from which to take resources from...";
+      VLOG(0) << "No slave from which to take resources from...";
 }
 
 void HierarchicalAllocatorProcess::initialize(
