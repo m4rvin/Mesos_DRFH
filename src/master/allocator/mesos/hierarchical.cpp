@@ -48,6 +48,8 @@ using process::Future;
 using process::Owned;
 using process::Timeout;
 
+int blind_policy_log_level = -1;
+
 namespace mesos {
 namespace internal {
 namespace master {
@@ -162,18 +164,18 @@ public:
     this->resourcesSlaveID = slaveId;
 
     // LOG messages. TODO remove
-    VLOG(0) << "total cpu=" << totalCpu.get();
+    VLOG(blind_policy_log_level) << "total cpu=" << totalCpu.get();
     if (allocatedCpu.isSome())
-      VLOG(0) << "allocated cpu=" << allocatedCpu.get();
+      VLOG(blind_policy_log_level) << "allocated cpu=" << allocatedCpu.get();
     else
-      VLOG(0) << "allocated cpu=" << 0;
-    VLOG(0) << "available cpu=" << availableCpu;
+      VLOG(blind_policy_log_level) << "allocated cpu=" << 0;
+    VLOG(blind_policy_log_level) << "available cpu=" << availableCpu;
 
-    VLOG(0) << "total mem=" << totalMemMB;
-    VLOG(0) << "allocated mem=" << allocatedMemMB;
-    VLOG(0) << "available mem=" << availableMemMB;
+    VLOG(blind_policy_log_level) << "total mem=" << totalMemMB;
+    VLOG(blind_policy_log_level) << "allocated mem=" << allocatedMemMB;
+    VLOG(blind_policy_log_level) << "available mem=" << availableMemMB;
 
-    VLOG(0) << "created complexResourcesRepresentation: "
+    VLOG(blind_policy_log_level) << "created complexResourcesRepresentation: "
             << complexResources;
   }
 
@@ -215,17 +217,18 @@ private:
 
 void HierarchicalAllocatorProcess::blindSort(vector<SlaveID>& slaveIds)
 {
-    VLOG(0) << "EXECUTING BLINDSORT";
+    VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
     if (slaveIds.size() > 0)
     {
       ComplexResourcesRepresentation complexRR(this, slaveIds[0]);
       if (ComplexResourcesRepresentation::complexResourceIsBalanced(complexRR))
-        VLOG(0) << "RESOURCE is balanced";
+        VLOG(blind_policy_log_level) << "RESOURCE is balanced";
       else
-        VLOG(0) << "RESOURCE is NOT balanced";
+        VLOG(blind_policy_log_level) << "RESOURCE is NOT balanced";
     }
     else
-      VLOG(0) << "No slave from which to take resources from...";
+      VLOG(blind_policy_log_level) <<
+      "No slave from which to take resources from...";
 }
 
 void HierarchicalAllocatorProcess::initialize(
