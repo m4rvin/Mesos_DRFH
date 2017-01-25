@@ -126,9 +126,39 @@ private:
 class ComplexResourcesRepresentation
 {
 public:
+  static Option<ComplexResourcesRepresentation>
+    createComplexResourcesRepresentation(
+        HierarchicalAllocatorProcess* process,
+        SlaveID slaveId)
+  {
+    ComplexResourcesRepresentation complexRR(process, slaveId);
+    // Check resources availability is not greater than 100%
+    CHECK_LE(complexRR.complexResources.real(), 1.0);
+    CHECK_LE(complexRR.complexResources.imag(), 1.0);
+
+    // If one of the resources is not available at all,
+    // do not return a representation
+    if (complexRR.complexResources.real() == 0 ||
+        complexRR.complexResources.imag() == 0)
+      return None();
+    return Option<ComplexResourcesRepresentation> (complexRR);
+  }
+
+  static bool complexResourceIsBalanced(
+      ComplexResourcesRepresentation complexRR)
+  {
+    if(complexRR.checkUpperBound() && complexRR.checkLowerBound())
+      return true;
+    return false;
+  }
+
+private:
+  complex<double> complexResources;
+  SlaveID resourcesSlaveID;
+
   ComplexResourcesRepresentation(
-      HierarchicalAllocatorProcess* process,
-      SlaveID slaveId)
+        HierarchicalAllocatorProcess* process,
+        SlaveID slaveId)
   {
     // retrieve total cpu capacity from a slave
     Option<double> totalCpu = process->slaves[slaveId].total.cpus();
@@ -179,21 +209,6 @@ public:
             << complexResources;
   }
 
-  static bool complexResourceIsBalanced(
-      ComplexResourcesRepresentation complexRR)
-  {
-    CHECK_LE(complexRR.complexResources.real(), 1.0);
-    CHECK_LE(complexRR.complexResources.imag(), 1.0);
-
-    if(complexRR.checkUpperBound() && complexRR.checkLowerBound())
-      return true;
-    return false;
-  }
-
-private:
-  complex<double> complexResources;
-  SlaveID resourcesSlaveID;
-
   bool checkUpperBound()
   {
     double real = this->complexResources.real();
@@ -220,8 +235,14 @@ void HierarchicalAllocatorProcess::blindSort(vector<SlaveID>& slaveIds)
     VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
     if (slaveIds.size() > 0)
     {
-      ComplexResourcesRepresentation complexRR(this, slaveIds[0]);
-      if (ComplexResourcesRepresentation::complexResourceIsBalanced(complexRR))
+      Option<ComplexResourcesRepresentation> complexRR =
+          ComplexResourcesRepresentation::createComplexResourcesRepresentation(
+              this,
+              slaveIds[0]);
+      if (complexRR.isNone())
+        return;
+      if (ComplexResourcesRepresentation::complexResourceIsBalanced(
+          complexRR.get()))
         VLOG(blind_policy_log_level) << "RESOURCE is balanced";
       else
         VLOG(blind_policy_log_level) << "RESOURCE is NOT balanced";
