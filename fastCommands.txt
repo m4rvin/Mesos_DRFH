@@ -6,9 +6,10 @@ mkdir build && cd build
 
 ../configure --prefix=/opt/mesos --disable-python --disable-java
 
-make -j2
+make -j4
 
-make check -j2
+GTEST_FILTER="" make check -j4
+make check -j4
 
 make install -j2 DESTDIR=/home/m4rvin/mesos_drfh/build/RUNNABLE
 
@@ -16,8 +17,10 @@ make install -j2 DESTDIR=/home/m4rvin/mesos_drfh/build/RUNNABLE
 
 #EXECUTION (LOCAL)
 
-./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog
+GLOG_v=0 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog
 
-./mesos-agent.sh --master=127.0.0.1:5050 --work_dir=/tmp/mesos --no-systemd_enable_support --log_dir=/tmp/mesosLog
+./mesos-agent.sh --master=127.0.0.1:5050 --work_dir=/tmp/mesos --no-systemd_enable_support --log_dir=/tmp/mesosLog --resources="cpus:1;mem:1024"
 
 ./test-framework --master=127.0.0.1:5050
+
+sudo ./balloon-framework --master=127.0.0.1:5050 --task_memory=128MB --task_memory_usage_limit=512MB
