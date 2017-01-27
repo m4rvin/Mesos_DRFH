@@ -208,7 +208,7 @@ protected:
   typedef HierarchicalAllocatorProcess This;
 
   // Blind sorting of slaves
-  void blindSort(std::vector<SlaveID>& slaveIds);
+  Option<std::vector<SlaveID>> blindSort(const std::vector<SlaveID>& slaveIds);
 
   // Idempotent helpers for pausing and resuming allocation.
   void pause();

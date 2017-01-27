@@ -152,6 +152,13 @@ public:
     return false;
   }
 
+  SlaveID getResourcesSlaveID()
+  {
+    return this->resourcesSlaveID;
+    // FIXME should be a copy!
+  }
+
+
 private:
   complex<double> complexResources;
   SlaveID resourcesSlaveID;
@@ -230,26 +237,71 @@ private:
   }
 };
 
-void HierarchicalAllocatorProcess::blindSort(vector<SlaveID>& slaveIds)
+Option<vector<SlaveID>> HierarchicalAllocatorProcess::blindSort(
+    const vector<SlaveID>& slaveIds)
 {
-    VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
-    if (slaveIds.size() > 0)
+  VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
+  if (slaveIds.size() > 0)
+  {
+    vector<SlaveID> balancedSlaveIds;
+    balancedSlaveIds.reserve(slaveIds.size());
+    vector<SlaveID> unbalancedSlaveIds;
+    int unusableSlaves = 0;
+
+    foreach(const SlaveID& slaveId, slaveIds)
     {
       Option<ComplexResourcesRepresentation> complexRR =
           ComplexResourcesRepresentation::createComplexResourcesRepresentation(
               this,
-              slaveIds[0]);
+              slaveId);
       if (complexRR.isNone())
-        return;
+      {
+        unusableSlaves++;
+        continue;
+      }
       if (ComplexResourcesRepresentation::complexResourceIsBalanced(
           complexRR.get()))
+      {
         VLOG(blind_policy_log_level) << "RESOURCE is balanced";
+        balancedSlaveIds.push_back(complexRR.get().getResourcesSlaveID());
+      }
       else
+      {
         VLOG(blind_policy_log_level) << "RESOURCE is NOT balanced";
+        unbalancedSlaveIds.push_back(complexRR.get().getResourcesSlaveID());
+      }
     }
-    else
-      VLOG(blind_policy_log_level) <<
-      "No slave from which to take resources from...";
+
+    if (unusableSlaves == static_cast<int>(slaveIds.size()))
+    {
+      VLOG(blind_policy_log_level) << "No slave has usable resources.";
+          return None();
+    }
+    vector<SlaveID> sortedSlaveIds;
+    sortedSlaveIds.reserve(slaveIds.size() - unusableSlaves);
+
+    // randomize balanced and unbalanced slaves separately
+    std::random_shuffle(balancedSlaveIds.begin(), balancedSlaveIds.end());
+    std::random_shuffle(unbalancedSlaveIds.begin(), unbalancedSlaveIds.end());
+
+    // put in the sorted list the balanced slaves first and unbalanced later
+    foreach(const SlaveID& slaveId, balancedSlaveIds)
+    {
+      sortedSlaveIds.push_back(slaveId);
+    }
+    foreach(const SlaveID& slaveId, unbalancedSlaveIds)
+    {
+      sortedSlaveIds.push_back(slaveId);
+    }
+
+    return Option<vector<SlaveID>> (sortedSlaveIds);
+  }
+  else
+  {
+    VLOG(blind_policy_log_level) <<
+    "No slave from which to take resources from...";
+    return None();
+  }
 }
 
 void HierarchicalAllocatorProcess::initialize(
@@ -1474,10 +1526,14 @@ void HierarchicalAllocatorProcess::allocate(
   // Randomize the order in which slaves' resources are allocated.
   //
   // TODO(vinod): Implement a smarter sorting algorithm.
-  std::random_shuffle(slaveIds.begin(), slaveIds.end());
-
-  blindSort(slaveIds);
-
+  // std::random_shuffle(slaveIds.begin(), slaveIds.end());
+  Option<vector<SlaveID>> sortedIds = blindSort(slaveIds);
+  if (sortedIds.isNone())
+    slaveIds.clear();
+  // TODO(danang): optimize the `foreach` following:
+  // set a variable to jump at the end of the function (i.e. deallocate)
+  else
+    slaveIds = sortedIds.get();
   // Returns the __quantity__ of resources allocated to a quota role. Since we
   // account for reservations and persistent volumes toward quota, we strip
   // reservation and persistent volume related information for comparability.
