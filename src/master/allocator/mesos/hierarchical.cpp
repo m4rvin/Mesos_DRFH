@@ -20,7 +20,7 @@
 #include <complex>
 #include <set>
 #include <string>
-#include <vector>
+
 
 #include <mesos/resources.hpp>
 #include <mesos/type_utils.hpp>
@@ -129,9 +129,10 @@ public:
   static Option<ComplexResourcesRepresentation>
     createComplexResourcesRepresentation(
         HierarchicalAllocatorProcess* process,
-        SlaveID slaveId)
+        SlaveID slaveId,
+        std::tuple<double, uint64_t> maxResources)
   {
-    ComplexResourcesRepresentation complexRR(process, slaveId);
+    ComplexResourcesRepresentation complexRR(process, slaveId, maxResources);
     // Check resources availability is not greater than 100%
     CHECK_LE(complexRR.complexResources.real(), 1.0);
     CHECK_LE(complexRR.complexResources.imag(), 1.0);
@@ -165,7 +166,8 @@ private:
 
   ComplexResourcesRepresentation(
         HierarchicalAllocatorProcess* process,
-        SlaveID slaveId)
+        SlaveID slaveId,
+        std::tuple<double, uint64_t> maxResources)
   {
     // retrieve total cpu capacity from a slave
     Option<double> totalCpu = process->slaves[slaveId].total.cpus();
@@ -196,8 +198,17 @@ private:
     double availablePercentageMem =
       availableMemMB / static_cast<double>(totalMemMB);
 
+    double maxCpu = std::get<0> (maxResources);
+    uint64_t maxMemMB = std::get<1> (maxResources);
+
+    double cpuNormalizationFactor = totalCpu.get()/maxCpu;
+    // FIXME possible issue if not casting also the divisor?
+    // FIXME better if casting the lower one or it doesn't matter?
+    double memNormalizationFactor = static_cast<double>(totalMemMB)/maxMemMB;
+
     this->complexResources =
-      complex<double> (availablePercentageCpu, availablePercentageMem);
+      complex<double> (availablePercentageCpu *cpuNormalizationFactor,
+                       availablePercentageMem * memNormalizationFactor);
     this->resourcesSlaveID = slaveId;
 
     // LOG messages. TODO remove
@@ -237,12 +248,37 @@ private:
   }
 };
 
+std::tuple<double, uint64_t>
+HierarchicalAllocatorProcess::findMaxResourcesCapacity(
+    const vector<SlaveID>& slaveIds)
+{
+  double maxCpu = 0.0;
+  uint64_t maxMemMB = 0;
+
+  foreach(const SlaveID& slaveId, slaveIds)
+  {
+    Option<double> totalCpu = this->slaves[slaveId].total.cpus();
+    CHECK_SOME(totalCpu);
+    Option<Bytes> totalMem = this->slaves[slaveId].total.mem();
+    CHECK_SOME(totalMem);
+
+    if (totalCpu.get() > maxCpu)
+      maxCpu = totalCpu.get();
+    if(totalMem.get().megabytes() > maxMemMB )
+      maxMemMB = totalMem.get().megabytes();
+  }
+
+  return std::tuple<double, double> (maxCpu, maxMemMB);
+}
+
 Option<vector<SlaveID>> HierarchicalAllocatorProcess::blindSort(
     const vector<SlaveID>& slaveIds)
 {
   VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
   if (slaveIds.size() > 0)
   {
+    std::tuple<double, uint64_t> maxResources =
+        findMaxResourcesCapacity(slaveIds);
     vector<SlaveID> balancedSlaveIds;
     balancedSlaveIds.reserve(slaveIds.size());
     vector<SlaveID> unbalancedSlaveIds;
@@ -253,7 +289,7 @@ Option<vector<SlaveID>> HierarchicalAllocatorProcess::blindSort(
       Option<ComplexResourcesRepresentation> complexRR =
           ComplexResourcesRepresentation::createComplexResourcesRepresentation(
               this,
-              slaveId);
+              slaveId, maxResources);
       if (complexRR.isNone())
       {
         unusableSlaves++;

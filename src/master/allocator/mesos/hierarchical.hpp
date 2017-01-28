@@ -19,6 +19,9 @@
 
 #include <set>
 #include <string>
+#include <vector>
+#include <tuple>
+
 
 #include <mesos/mesos.hpp>
 
@@ -209,6 +212,9 @@ protected:
 
   // Blind sorting of slaves
   Option<std::vector<SlaveID>> blindSort(const std::vector<SlaveID>& slaveIds);
+
+  std::tuple<double, uint64_t> findMaxResourcesCapacity(
+      const std::vector<SlaveID>& slaveIds);
 
   // Idempotent helpers for pausing and resuming allocation.
   void pause();
