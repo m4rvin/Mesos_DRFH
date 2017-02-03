@@ -1530,6 +1530,406 @@ void HierarchicalAllocatorProcess::allocate(
           << stopwatch.elapsed();
 }
 
+void HierarchicalAllocatorProcess::allocateToFrameworks(
+    const hashset<SlaveID>& slaveIds_)
+{
+  ++metrics.allocation_runs;
+
+  // Compute the offerable resources, per framework:
+  //   (1) For reserved resources on the slave, allocate these to a
+  //       framework having the corresponding role.
+  //   (2) For unreserved resources on the slave, allocate these
+  //       to a framework of any role.
+  hashmap<FrameworkID, hashmap<SlaveID, Resources>> offerable;
+
+  // NOTE: This function can operate on a small subset of slaves, we have to
+  // make sure that we don't assume cluster knowledge when summing resources
+  // from that set.
+
+  vector<SlaveID> slaveIds;
+  slaveIds.reserve(slaveIds_.size());
+
+  // Filter out non-whitelisted and deactivated slaves in order not to send
+  // offers for them.
+  foreach (const SlaveID& slaveId, slaveIds_) {
+    if (isWhitelisted(slaveId) && slaves[slaveId].activated) {
+      slaveIds.push_back(slaveId);
+    }
+  }
+
+  // Randomize the order in which slaves' resources are allocated.
+  //
+  // TODO(vinod): Implement a smarter sorting algorithm.
+  // std::random_shuffle(slaveIds.begin(), slaveIds.end());
+  Option<vector<SlaveID>> sortedIds = blindSort(slaveIds);
+  if (sortedIds.isNone())
+    slaveIds.clear();
+  // TODO(danang): optimize the `foreach` following:
+  // set a variable to jump at the end of the function (i.e. deallocate)
+  else
+    slaveIds = sortedIds.get();
+  // Returns the __quantity__ of resources allocated to a quota role. Since we
+  // account for reservations and persistent volumes toward quota, we strip
+  // reservation and persistent volume related information for comparability.
+  // The result is used to determine whether a role's quota is satisfied, and
+  // also to determine how many resources the role would need in order to meet
+  // its quota.
+  //
+  // NOTE: Revocable resources are excluded in `quotaRoleSorter`.
+  auto getQuotaRoleAllocatedResources = [this](const string& role) {
+    CHECK(quotas.contains(role));
+
+    // NOTE: `allocationScalarQuantities` omits dynamic reservation and
+    // persistent volume info, but we additionally strip `role` here.
+    Resources resources;
+
+    foreach (Resource resource,
+             quotaRoleSorter->allocationScalarQuantities(role)) {
+      CHECK(!resource.has_reservation());
+      CHECK(!resource.has_disk());
+
+      resource.set_role("*");
+      resources += resource;
+    }
+
+    return resources;
+  };
+
+  // Due to the two stages in the allocation algorithm and the nature of
+  // shared resources being re-offerable even if already allocated, the
+  // same shared resources can appear in two (and not more due to the
+  // `allocatable` check in each stage) distinct offers in one allocation
+  // cycle. This is undesirable since the allocator API contract should
+  // not depend on its implementation details. For now we make sure a
+  // shared resource is only allocated once in one offer cycle. We use
+  // `offeredSharedResources` to keep track of shared resources already
+  // allocated in the current cycle.
+  hashmap<SlaveID, Resources> offeredSharedResources;
+
+  // Quota comes first and fair share second. Here we process only those
+  // roles, for which quota is set (quota'ed roles). Such roles form a
+  // special allocation group with a dedicated sorter.
+  foreach (const SlaveID& slaveId, slaveIds) {
+    foreach (const string& role, quotaRoleSorter->sort()) {
+      CHECK(quotas.contains(role));
+
+      // If there are no active frameworks in this role, we do not
+      // need to do any allocations for this role.
+      if (!activeRoles.contains(role)) {
+        continue;
+      }
+
+      // Get the total quantity of resources allocated to a quota role. The
+      // value omits role, reservation, and persistence info.
+      Resources roleConsumedResources = getQuotaRoleAllocatedResources(role);
+
+      // If quota for the role is satisfied, we do not need to do any further
+      // allocations for this role, at least at this stage.
+      //
+      // TODO(alexr): Skipping satisfied roles is pessimistic. Better
+      // alternatives are:
+      //   * A custom sorter that is aware of quotas and sorts accordingly.
+      //   * Removing satisfied roles from the sorter.
+      if (roleConsumedResources.contains(quotas[role].info.guarantee())) {
+        continue;
+      }
+
+      // Fetch frameworks according to their fair share.
+      // NOTE: Suppressed frameworks are not included in the sort.
+      foreach (const string& frameworkId_, frameworkSorters[role]->sort()) {
+        FrameworkID frameworkId;
+        frameworkId.set_value(frameworkId_);
+
+        // Only offer resources from slaves that have GPUs to
+        // frameworks that are capable of receiving GPUs.
+        // See MESOS-5634.
+        if (!frameworks[frameworkId].gpuAware &&
+            slaves[slaveId].total.gpus().getOrElse(0) > 0) {
+          continue;
+        }
+
+        // Calculate the currently available resources on the slave, which
+        // is the difference in non-shared resources between total and
+        // allocated, plus all shared resources on the agent (if applicable).
+        // Since shared resources are offerable even when they are in use, we
+        // make one copy of the shared resources available regardless of the
+        // past allocations.
+        Resources available =
+          (slaves[slaveId].total - slaves[slaveId].allocated).nonShared();
+
+        // Offer a shared resource only if it has not been offered in
+        // this offer cycle to a framework.
+        if (frameworks[frameworkId].shared) {
+          available += slaves[slaveId].total.shared();
+          if (offeredSharedResources.contains(slaveId)) {
+            available -= offeredSharedResources[slaveId];
+          }
+        }
+
+        // The resources we offer are the unreserved resources as well as the
+        // reserved resources for this particular role. This is necessary to
+        // ensure that we don't offer resources that are reserved for another
+        // role.
+        //
+        // NOTE: Currently, frameworks are allowed to have '*' role.
+        // Calling reserved('*') returns an empty Resources object.
+        //
+        // Quota is satisfied from the available non-revocable resources on the
+        // agent. It's important that we include reserved resources here since
+        // reserved resources are accounted towards the quota guarantee. If we
+        // were to rely on stage 2 to offer them out, they would not be checked
+        // against the quota guarantee.
+        Resources resources =
+          (available.unreserved() + available.reserved(role)).nonRevocable();
+
+        // It is safe to break here, because all frameworks under a role would
+        // consider the same resources, so in case we don't have allocatable
+        // resources, we don't have to check for other frameworks under the
+        // same role. We only break out of the innermost loop, so the next step
+        // will use the same `slaveId`, but a different role.
+        //
+        // NOTE: The resources may not be allocatable here, but they can be
+        // accepted by one of the frameworks during the second allocation
+        // stage.
+        if (!allocatable(resources)) {
+          break;
+        }
+
+        // If the framework filters these resources, ignore. The unallocated
+        // part of the quota will not be allocated to other roles.
+        if (isFiltered(frameworkId, slaveId, resources)) {
+          continue;
+        }
+
+        VLOG(2) << "Allocating " << resources << " on agent " << slaveId
+                << " to framework " << frameworkId
+                << " as part of its role quota";
+
+        // NOTE: We perform "coarse-grained" allocation for quota'ed
+        // resources, which may lead to overcommitment of resources beyond
+        // quota. This is fine since quota currently represents a guarantee.
+        offerable[frameworkId][slaveId] += resources;
+        offeredSharedResources[slaveId] += resources.shared();
+
+        slaves[slaveId].allocated += resources;
+
+        // Resources allocated as part of the quota count towards the
+        // role's and the framework's fair share.
+        //
+        // NOTE: Revocable resources have already been excluded.
+        frameworkSorters[role]->add(slaveId, resources);
+        frameworkSorters[role]->allocated(frameworkId_, slaveId, resources);
+        roleSorter->allocated(role, slaveId, resources);
+        quotaRoleSorter->allocated(role, slaveId, resources);
+      }
+    }
+  }
+
+  // Calculate the total quantity of scalar resources (including revocable
+  // and reserved) that are available for allocation in the next round. We
+  // need this in order to ensure we do not over-allocate resources during
+  // the second stage.
+  //
+  // For performance reasons (MESOS-4833), this omits information about
+  // dynamic reservations or persistent volumes in the resources.
+  //
+  // NOTE: We use total cluster resources, and not just those based on the
+  // agents participating in the current allocation (i.e. provided as an
+  // argument to the `allocate()` call) so that frameworks in roles without
+  // quota are not unnecessarily deprived of resources.
+  Resources remainingClusterResources = roleSorter->totalScalarQuantities();
+  foreachkey (const string& role, activeRoles) {
+    remainingClusterResources -= roleSorter->allocationScalarQuantities(role);
+  }
+
+  // Frameworks in a quota'ed role may temporarily reject resources by
+  // filtering or suppressing offers. Hence quotas may not be fully allocated.
+  Resources unallocatedQuotaResources;
+  foreachpair (const string& name, const Quota& quota, quotas) {
+    // Compute the amount of quota that the role does not have allocated.
+    //
+    // NOTE: Revocable resources are excluded in `quotaRoleSorter`.
+    // NOTE: Only scalars are considered for quota.
+    Resources allocated = getQuotaRoleAllocatedResources(name);
+    const Resources required = quota.info.guarantee();
+    unallocatedQuotaResources += (required - allocated);
+  }
+
+  // Determine how many resources we may allocate during the next stage.
+  //
+  // NOTE: Resources for quota allocations are already accounted in
+  // `remainingClusterResources`.
+  remainingClusterResources -= unallocatedQuotaResources;
+
+  // Shared resources are excluded in determination of over-allocation of
+  // available resources since shared resources are always allocatable.
+  remainingClusterResources = remainingClusterResources.nonShared();
+
+  // To ensure we do not over-allocate resources during the second stage
+  // with all frameworks, we use 2 stopping criteria:
+  //   * No available resources for the second stage left, i.e.
+  //     `remainingClusterResources` - `allocatedStage2` is empty.
+  //   * A potential offer will force the second stage to use more resources
+  //     than available, i.e. `remainingClusterResources` does not contain
+  //     (`allocatedStage2` + potential offer). In this case we skip this
+  //     agent and continue to the next one.
+  //
+  // NOTE: Like `remainingClusterResources`, `allocatedStage2` omits
+  // information about dynamic reservations and persistent volumes for
+  // performance reasons. This invariant is preserved because we only add
+  // resources to it that have also had this metadata stripped from them
+  // (typically by using `Resources::createStrippedScalarQuantity`).
+  Resources allocatedStage2;
+
+  // At this point resources for quotas are allocated or accounted for.
+  // Proceed with allocating the remaining free pool.
+  foreach (const SlaveID& slaveId, slaveIds) {
+    // If there are no resources available for the second stage, stop.
+    if (!allocatable(remainingClusterResources - allocatedStage2)) {
+      break;
+    }
+
+    foreach (const string& role, roleSorter->sort()) {
+      // NOTE: Suppressed frameworks are not included in the sort.
+      foreach (const string& frameworkId_,
+               frameworkSorters[role]->sort()) {
+        FrameworkID frameworkId;
+        frameworkId.set_value(frameworkId_);
+
+        // Only offer resources from slaves that have GPUs to
+        // frameworks that are capable of receiving GPUs.
+        // See MESOS-5634.
+        if (!frameworks[frameworkId].gpuAware &&
+            slaves[slaveId].total.gpus().getOrElse(0) > 0) {
+          continue;
+        }
+
+        // Calculate the currently available resources on the slave, which
+        // is the difference in non-shared resources between total and
+        // allocated, plus all shared resources on the agent (if applicable).
+        // Since shared resources are offerable even when they are in use, we
+        // make one copy of the shared resources available regardless of the
+        // past allocations.
+        Resources available =
+          (slaves[slaveId].total - slaves[slaveId].allocated).nonShared();
+
+        // Offer a shared resource only if it has not been offered in
+        // this offer cycle to a framework.
+        if (frameworks[frameworkId].shared) {
+          available += slaves[slaveId].total.shared();
+          if (offeredSharedResources.contains(slaveId)) {
+            available -= offeredSharedResources[slaveId];
+          }
+        }
+
+        // The resources we offer are the unreserved resources as well as the
+        // reserved resources for this particular role. This is necessary to
+        // ensure that we don't offer resources that are reserved for another
+        // role.
+        //
+        // NOTE: Currently, frameworks are allowed to have '*' role.
+        // Calling reserved('*') returns an empty Resources object.
+        //
+        // NOTE: We do not offer roles with quota any more non-revocable
+        // resources once their quota is satisfied. However, note that this is
+        // not strictly true due to the coarse-grained nature (per agent) of the
+        // allocation algorithm in stage 1.
+        //
+        // TODO(mpark): Offer unreserved resources as revocable beyond quota.
+        Resources resources = available.reserved(role);
+        if (!quotas.contains(role)) {
+          resources += available.unreserved();
+        }
+
+        // It is safe to break here, because all frameworks under a role would
+        // consider the same resources, so in case we don't have allocatable
+        // resources, we don't have to check for other frameworks under the
+        // same role. We only break out of the innermost loop, so the next step
+        // will use the same slaveId, but a different role.
+        //
+        // The difference to the second `allocatable` check is that here we also
+        // check for revocable resources, which can be disabled on a per frame-
+        // work basis, which requires us to go through all frameworks in case we
+        // have allocatable revocable resources.
+        if (!allocatable(resources)) {
+          break;
+        }
+
+        // Remove revocable resources if the framework has not opted for them.
+        if (!frameworks[frameworkId].revocable) {
+          resources = resources.nonRevocable();
+        }
+
+        // If the resources are not allocatable, ignore. We cannot break
+        // here, because another framework under the same role could accept
+        // revocable resources and breaking would skip all other frameworks.
+        if (!allocatable(resources)) {
+          continue;
+        }
+
+        // If the framework filters these resources, ignore.
+        if (isFiltered(frameworkId, slaveId, resources)) {
+          continue;
+        }
+
+        // If the offer generated by `resources` would force the second
+        // stage to use more than `remainingClusterResources`, move along.
+        // We do not terminate early, as offers generated further in the
+        // loop may be small enough to fit within `remainingClusterResources`.
+        //
+        // We exclude shared resources from over-allocation check because
+        // shared resources are always allocatable.
+        const Resources scalarQuantity =
+          resources.nonShared().createStrippedScalarQuantity();
+
+        if (!remainingClusterResources.contains(
+                allocatedStage2 + scalarQuantity)) {
+          continue;
+        }
+
+        VLOG(2) << "Allocating " << resources << " on agent " << slaveId
+                << " to framework " << frameworkId;
+
+        // NOTE: We perform "coarse-grained" allocation, meaning that we always
+        // allocate the entire remaining slave resources to a single framework.
+        //
+        // NOTE: We may have already allocated some resources on the current
+        // agent as part of quota.
+        offerable[frameworkId][slaveId] += resources;
+        offeredSharedResources[slaveId] += resources.shared();
+        allocatedStage2 += scalarQuantity;
+
+        slaves[slaveId].allocated += resources;
+
+        frameworkSorters[role]->add(slaveId, resources);
+        frameworkSorters[role]->allocated(frameworkId_, slaveId, resources);
+        roleSorter->allocated(role, slaveId, resources);
+
+        if (quotas.contains(role)) {
+          // See comment at `quotaRoleSorter` declaration regarding
+          // non-revocable.
+          quotaRoleSorter->allocated(role, slaveId, resources.nonRevocable());
+        }
+      }
+    }
+  }
+
+  if (offerable.empty()) {
+    VLOG(1) << "No allocations performed";
+  } else {
+    // Now offer the resources to each framework.
+    foreachkey (const FrameworkID& frameworkId, offerable) {
+      offerCallback(frameworkId, offerable[frameworkId]);
+    }
+  }
+
+  // NOTE: For now, we implement maintenance inverse offers within the
+  // allocator. We leverage the existing timer/cycle of offers to also do any
+  // "deallocation" (inverse offers) necessary to satisfy maintenance needs.
+  deallocate(slaveIds_);
+}
+
+
 
 // TODO(alexr): Consider factoring out the quota allocation logic.
 void HierarchicalAllocatorProcess::allocate(

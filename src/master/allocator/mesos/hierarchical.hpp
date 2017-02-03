@@ -232,6 +232,10 @@ protected:
   // Allocate resources from the specified slaves.
   void allocate(const hashset<SlaveID>& slaveIds);
 
+  // Allocate resources from the specified slaves, but do not take into account
+  // quota or roles (i.e.: use case with only frameworks inside the * role)
+  void allocateToFrameworks(const hashset<SlaveID>& slaveIds_);
+
   // Send inverse offers from the specified slaves.
   void deallocate(const hashset<SlaveID>& slaveIds);
 
