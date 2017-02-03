@@ -1562,14 +1562,8 @@ void HierarchicalAllocatorProcess::allocate(
   // Randomize the order in which slaves' resources are allocated.
   //
   // TODO(vinod): Implement a smarter sorting algorithm.
-  // std::random_shuffle(slaveIds.begin(), slaveIds.end());
-  Option<vector<SlaveID>> sortedIds = blindSort(slaveIds);
-  if (sortedIds.isNone())
-    slaveIds.clear();
-  // TODO(danang): optimize the `foreach` following:
-  // set a variable to jump at the end of the function (i.e. deallocate)
-  else
-    slaveIds = sortedIds.get();
+  std::random_shuffle(slaveIds.begin(), slaveIds.end());
+
   // Returns the __quantity__ of resources allocated to a quota role. Since we
   // account for reservations and persistent volumes toward quota, we strip
   // reservation and persistent volume related information for comparability.
