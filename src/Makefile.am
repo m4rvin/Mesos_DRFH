@@ -1872,6 +1872,16 @@ test_executor_SOURCES = examples/test_executor.cpp
 test_executor_CPPFLAGS = $(MESOS_CPPFLAGS)
 test_executor_LDADD = libmesos.la $(LDADD)
 
+check_PROGRAMS += test-framework-drfh
+test_framework_drfh_SOURCES = examples/test_framework_drfh.cpp
+test_framework_drfh_CPPFLAGS = $(MESOS_CPPFLAGS)
+test_framework_drfh_LDADD = libmesos.la $(LDADD)
+
+check_PROGRAMS += test-executor-drfh
+test_executor_drfh_SOURCES = examples/test_executor_drfh.cpp
+test_executor_drfh_CPPFLAGS = $(MESOS_CPPFLAGS)
+test_executor_drfh_LDADD = libmesos.la $(LDADD)
+
 check_PROGRAMS += test-http-executor
 test_http_executor_SOURCES = examples/test_http_executor.cpp
 test_http_executor_CPPFLAGS = $(MESOS_CPPFLAGS)
