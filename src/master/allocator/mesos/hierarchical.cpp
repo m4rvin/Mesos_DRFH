@@ -1499,14 +1499,14 @@ void HierarchicalAllocatorProcess::allocate()
 
   metrics.allocation_run.start();
 
-  allocate(slaves.keys());
+  // allocate(slaves.keys);
+  allocateToFrameworks(slaves.keys());
 
   metrics.allocation_run.stop();
 
   VLOG(1) << "Performed allocation for " << slaves.size() << " agents in "
             << stopwatch.elapsed();
 }
-
 
 void HierarchicalAllocatorProcess::allocate(
     const SlaveID& slaveId)
@@ -1522,7 +1522,8 @@ void HierarchicalAllocatorProcess::allocate(
   metrics.allocation_run.start();
 
   hashset<SlaveID> slaves({slaveId});
-  allocate(slaves);
+  // allocate(slaves);
+  allocateToFrameworks(slaves);
 
   metrics.allocation_run.stop();
 
@@ -1530,124 +1531,177 @@ void HierarchicalAllocatorProcess::allocate(
           << stopwatch.elapsed();
 }
 
+Option<std::tuple<SlaveID, Resources>>
+HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
+{
+  // Randomize the order in which slaves' resources are allocated.
+    //
+    // TODO(vinod): Implement a smarter sorting algorithm.
+    // std::random_shuffle(slaveIds.begin(), slaveIds.end());
+    /*
+    Option<vector<SlaveID>> sortedIds = blindSort(slaveIds);
+    if (sortedIds.isNone())
+      slaveIds.clear();
+    // TODO(danang): optimize the `foreach` following:
+    // set a variable to jump at the end of the function (i.e. deallocate)
+    else
+      slaveIds = sortedIds.get();
+    */
+  auto it = slaves.begin();
+  if (it == slaves.end())
+    return None();
+  Option<std::tuple<SlaveID, Resources>> selectedSlave = Some(*it);
+  slaves.erase(it->first);
+  return selectedSlave;
+  // return None();
+}
+
 void HierarchicalAllocatorProcess::allocateToFrameworks(
     const hashset<SlaveID>& slaveIds_)
 {
-  ++metrics.allocation_runs;
-
-  // Compute the offerable resources, per framework:
-  //   (1) For reserved resources on the slave, allocate these to a
-  //       framework having the corresponding role.
-  //   (2) For unreserved resources on the slave, allocate these
-  //       to a framework of any role.
-  hashmap<FrameworkID, hashmap<SlaveID, Resources>> offerable;
-
-  // NOTE: This function can operate on a small subset of slaves, we have to
+  // NOTE: This function can operate on a small subset of slaves
+  // (i.e. it could be called on a subset of all cluster slaves), we have to
   // make sure that we don't assume cluster knowledge when summing resources
   // from that set.
 
-  vector<SlaveID> slaveIds;
-  slaveIds.reserve(slaveIds_.size());
+  ++metrics.allocation_runs;
+  const string starRole = "*";
 
-  // Filter out non-whitelisted and deactivated slaves in order not to send
-  // offers for them.
+  if(roleSorter->count() == 0) {
+    VLOG(1) << "No allocations performed: there aren't registered frameworks.";
+    return;
+  }
+
+  bool allocatableSlaves = true;
+
+  // Compute the offerable resources, per framework:
+  //   (1) Resources cannot be reserved because currently we only allow
+  //       the * role.
+  //   (2) Resources cannot be shared because currently we don't allow it
+  //   (3) GPU resources are not allowed currently.
+  //   (4) Oversubscription not supported.
+  hashmap<FrameworkID, hashmap<SlaveID, Resources>> offerable;
+
+  hashmap<SlaveID, Resources> slavesResources;
+  slavesResources.reserve(slaveIds_.size());
+
+  // Filter out non-whitelisted, deactivated or non-allocatable slaves in order
+  // not to send offers for them.
   foreach (const SlaveID& slaveId, slaveIds_) {
     if (isWhitelisted(slaveId) && slaves[slaveId].activated) {
-      slaveIds.push_back(slaveId);
+      Resources available = slaves[slaveId].total - slaves[slaveId].allocated;
+      if (allocatable(available))
+        slavesResources.insert({slaveId, available});
     }
   }
 
-  // Randomize the order in which slaves' resources are allocated.
-  //
-  // TODO(vinod): Implement a smarter sorting algorithm.
-  // std::random_shuffle(slaveIds.begin(), slaveIds.end());
-  Option<vector<SlaveID>> sortedIds = blindSort(slaveIds);
-  if (sortedIds.isNone())
-    slaveIds.clear();
-  // TODO(danang): optimize the `foreach` following:
-  // set a variable to jump at the end of the function (i.e. deallocate)
-  else
-    slaveIds = sortedIds.get();
-
-  // TODO(danang): the following is only to keep the useful code from allocate()
-  // Implement the workflow.
-  /*
-  // Only offer resources from slaves that have GPUs to
-  // frameworks that are capable of receiving GPUs.
-  // See MESOS-5634.
-  if (!frameworks[frameworkId].gpuAware &&
-      slaves[slaveId].total.gpus().getOrElse(0) > 0) {
-    continue;
+  // No slave is active/whitelisted or no slave has allocatable resources
+  // (i.e. MIN CPU/MEM).
+  if (slavesResources.size() == 0) {
+    allocatableSlaves = false;
+    VLOG(1) << "No allocations performed: there aren't available resources.";
   }
-  */
-  /*
-   *
-        // Calculate the currently available resources on the slave, which
-        // is the difference in non-shared resources between total and
-        // allocated, plus all shared resources on the agent (if applicable).
-        // Since shared resources are offerable even when they are in use, we
-        // make one copy of the shared resources available regardless of the
-        // past allocations.
-        Resources available =
-          slaves[slaveId].total - slaves[slaveId].allocated;
 
+  // A framework could be blacklisted in the current allocation cycle,
+  // if all the slave resources are filtered by it.
+  hashset<string> blacklistedFrameworks;
+  bool selectableFrameworks = true;
 
-        // The resources we offer are the unreserved resources as well as the
-        // reserved resources for this particular role. This is necessary to
-        // ensure that we don't offer resources that are reserved for another
-        // role.
-        //
-        // NOTE: Currently, frameworks are allowed to have '*' role.
-        // Calling reserved('*') returns an empty Resources object.
-        //
-        // Quota is satisfied from the available non-revocable resources on the
-        // agent. It's important that we include reserved resources here since
-        // reserved resources are accounted towards the quota guarantee. If we
-        // were to rely on stage 2 to offer them out, they would not be checked
-        // against the quota guarantee.
-        Resources resources = available
-        // = (available.unreserved() + available.reserved(role)).nonRevocable();
+  while(allocatableSlaves && selectableFrameworks)
+  {
+    FrameworkID frameworkId;
 
-        // It is safe to break here, because all frameworks under a role would
-        // consider the same resources, so in case we don't have allocatable
-        // resources, we don't have to check for other frameworks under the
-        // same role. We only break out of the innermost loop, so the next step
-        // will use the same `slaveId`, but a different role.
-        //
-        // NOTE: The resources may not be allocatable here, but they can be
-        // accepted by one of the frameworks during the second allocation
-        // stage.
-        if (!allocatable(resources)) {
-          break;
-        }
+    // Sort the frameworks and choose the first one that is not in blacklist.
+    // TODO(danang) improve the following section of code.
+    CHECK(roleSorter->contains(starRole));
+    std::vector<std::string> sortedFrameworks =
+        frameworkSorters[starRole]->sort();
 
-        // If the framework filters these resources, ignore. The unallocated
-        // part of the quota will not be allocated to other roles.
-        if (isFiltered(frameworkId, slaveId, resources)) {
+    bool candidateFrameworkFound = false;
+    for(int i = 0; i < static_cast<int>(sortedFrameworks.size()); i++)
+    {
+      if (blacklistedFrameworks.contains(sortedFrameworks[i]))
           continue;
-        }
-
-        VLOG(2) << "Allocating " << resources << " on agent " << slaveId
-                    << " to framework " << frameworkId;
-
-        // NOTE: We perform "coarse-grained" allocation for quota'ed
-        // resources, which may lead to overcommitment of resources beyond
-        // quota. This is fine since quota currently represents a guarantee.
-        offerable[frameworkId][slaveId] += resources;
-
-        slaves[slaveId].allocated += resources;
-
-        // Resources allocated as part of the quota count towards the
-        // role's and the framework's fair share.
-        //
-        // NOTE: Revocable resources have already been excluded.
-        frameworkSorters[role]->add(slaveId, resources);
-        frameworkSorters[role]->allocated(frameworkId_, slaveId, resources);
-        roleSorter->allocated(role, slaveId, resources);
+      else {
+        // Framework chosen.
+        frameworkId.set_value(sortedFrameworks[i]);
+        candidateFrameworkFound = true;
+        break;
       }
     }
+    if (!candidateFrameworkFound) {
+      selectableFrameworks = false;
+      VLOG(1) <<
+         "Every framework filtered available resources.";
+      continue;
+    }
+    VLOG(1) << "Selected frameworks with ID: " << frameworkId.value();
+
+    /*
+    if (frameworks[frameworkId].gpuAware)
+      LOG(WARNING) << "GPU resources are not currently supported. "
+                   << "The resource demand will not be satisfied, "
+                   << "so please remove it.";
+     // deallocate pointers and return.
+    */
+    CHECK (!frameworks[frameworkId].gpuAware);
+
+    // Use a copy of the list of current slaves with available resources.
+    hashmap<SlaveID, Resources> candidateSlavesResources (slavesResources);
+    bool acceptableOffer = false;
+    Option<std::tuple<SlaveID, Resources>> selectedSlave;
+    SlaveID slaveId;
+    Resources resources;
+
+    while(!acceptableOffer)
+    {
+      selectedSlave = pickOutSlave(candidateSlavesResources);
+      if (selectedSlave.isNone())
+        break;
+
+      slaveId = std::get<0> (selectedSlave.get());
+      resources = std::get<1> (selectedSlave.get());
+      VLOG(1) << "Selected agent " << slaveId
+              << ", with resources " << resources
+              << ", for framework " << frameworkId.value();
+      // If the framework filters these resources, ignore. The unallocated
+      // part of the quota will not be allocated to other roles.
+      if (isFiltered(frameworkId, slaveId, resources)) {
+        continue;
+      }
+      acceptableOffer = true;
+    }
+    // If all the slave resources are filtered by this framework, then put the
+    // framework in a blacklist for the current allocation cycle and continue
+    // (i.e. choose another framework).
+    if (!acceptableOffer) {
+      blacklistedFrameworks.insert(frameworkId.value());
+      VLOG(1) << "Framework " << frameworkId.value()
+              << " doesn't accept any of the available slaves. "
+              << "It will not be selected for other allocations in this cycle.";
+      continue;
+    }
+
+    VLOG(2) << "Allocating " << resources << " on agent " << slaveId
+                       << " to framework " << frameworkId;
+
+    offerable[frameworkId][slaveId] += resources;
+    slaves[slaveId].allocated += resources;
+
+    // Since we allocate the whole slave's resources, the slave is no more
+    // allocatable, so remove it from the list of slaves used in this
+    // allocation cycle.
+    slavesResources.erase(slaveId);
+      if (slavesResources.size() == 0)
+        allocatableSlaves = false;
+
+    frameworkSorters[starRole]->add(slaveId, resources);
+    frameworkSorters[starRole]->allocated(
+        frameworkId.value(),
+        slaveId,
+        resources);
+    roleSorter->allocated(starRole, slaveId, resources);
   }
-  */
 
   if (offerable.empty()) {
     VLOG(1) << "No allocations performed";
@@ -1658,9 +1712,6 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
     }
   }
 
-  // NOTE: For now, we implement maintenance inverse offers within the
-  // allocator. We leverage the existing timer/cycle of offers to also do any
-  // "deallocation" (inverse offers) necessary to satisfy maintenance needs.
   deallocate(slaveIds_);
 }
 

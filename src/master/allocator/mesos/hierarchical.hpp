@@ -239,6 +239,12 @@ protected:
   // Send inverse offers from the specified slaves.
   void deallocate(const hashset<SlaveID>& slaveIds);
 
+  // Pick out a slave from the list passed as argument,
+  // removing it from that list.
+  // If no slaves could be picked out, return None.
+  Option<std::tuple<SlaveID, Resources>> pickOutSlave(
+      hashmap<SlaveID, Resources>& slaves);
+
   // Remove an offer filter for the specified framework.
   void expire(
       const FrameworkID& frameworkId,
