@@ -240,12 +240,12 @@ int main(int argc, char** argv)
   ExecutorInfo executor;
   executor.mutable_executor_id()->set_value("default");
   executor.mutable_command()->set_value(uri);
-  executor.set_name("Test Executor (C++)");
+  executor.set_name("Test Executor DRFH (C++)");
   executor.set_source("cpp_test");
 
   FrameworkInfo framework;
   framework.set_user(""); // Have Mesos fill in the current user.
-  framework.set_name("Test Framework (C++)");
+  framework.set_name("Test Framework DRFH (C++)");
   framework.set_role(role);
 
   value = os::getenv("MESOS_CHECKPOINT");
@@ -293,7 +293,7 @@ int main(int argc, char** argv)
         implicitAcknowledgements,
         credential);
   } else {
-    framework.set_principal("test-framework-cpp");
+    framework.set_principal("test-framework-DRFH-cpp");
 
     driver = new MesosSchedulerDriver(
         &scheduler,
