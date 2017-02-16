@@ -68,6 +68,7 @@ std::default_random_engine cpuGenerator;
 // std::uniform_int_distribution<int32_t> cpuDistribution(1,10);
 static const double LAMBDA_PARAM = 1.3;
 std::exponential_distribution<double> cpuDistribution(LAMBDA_PARAM);
+// NB: the following will generate numbers starting from 0, so add +1.
 auto generateTaskCPU = std::bind (cpuDistribution, cpuGenerator);
 
 std::default_random_engine memGenerator;
@@ -164,8 +165,10 @@ public:
         int launchedTasks = 0;
         vector<TaskInfo> tasks;
         // FIXME tasks.reserve(tasksToLaunch);
+
         while (allocatable(remaining) && launchedTasks < tasksToLaunch) {
           int32_t cpu = static_cast<int32_t>(generateTaskCPU()) + 1;
+          CHECK(cpu > 0);
           int32_t mem = 0;
           do{
             mem = static_cast<int32_t>(generateTaskMEM());
