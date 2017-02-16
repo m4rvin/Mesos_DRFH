@@ -14,7 +14,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <glog/logging.h>
+
 #include <iostream>
+#include <random>
+#include <thread>
 
 #include <mesos/executor.hpp>
 
@@ -27,6 +31,11 @@ using std::cout;
 using std::endl;
 using std::string;
 
+std::default_random_engine taskDurationGenerator;
+std::uniform_int_distribution<int> taskDurationDistribution(10, 120);
+// TODO(danang) make this function thread-safe
+auto generateTasksDuration =
+    std::bind (taskDurationDistribution, taskDurationGenerator);
 
 class TestExecutor : public Executor
 {
@@ -49,26 +58,45 @@ public:
 
   virtual void disconnected(ExecutorDriver* driver) {}
 
-  virtual void launchTask(ExecutorDriver* driver, const TaskInfo& task)
+  void run(ExecutorDriver* driver, const TaskInfo& task)
   {
-    cout << "Starting task " << task.task_id().value() << endl;
-
     TaskStatus status;
     status.mutable_task_id()->MergeFrom(task.task_id());
     status.set_state(TASK_RUNNING);
 
     driver->sendStatusUpdate(status);
 
+    int taskDuration = generateTasksDuration();
+    LOG(INFO) << "Task with ID: "
+              <<  task.task_id().value()
+              <<" is going to work for "
+              << taskDuration << " seconds";
+
     // This is where one would perform the requested task.
-    os::sleep(Seconds(7));
+    os::sleep(Seconds(taskDuration));
 
-
-    cout << "Finishing task " << task.task_id().value() << endl;
+    LOG(INFO) << "Task with ID: "
+              << task.task_id().value()
+              <<  " terminated its work";
 
     status.mutable_task_id()->MergeFrom(task.task_id());
     status.set_state(TASK_FINISHED);
 
     driver->sendStatusUpdate(status);
+
+    // TODO(danang) find a way to stop the driver without killing the process.
+  }
+
+  virtual void launchTask(ExecutorDriver* driver, const TaskInfo& task)
+  {
+    // NOTE: The executor driver calls `launchTask` synchronously, which
+    // means that calls such as `driver->sendStatusUpdate()` will not execute
+    // until `launchTask` returns.
+    std::thread thread([=]() {
+      run(driver, task);
+    });
+
+    thread.detach();
   }
 
   virtual void killTask(ExecutorDriver* driver, const TaskID& taskId) {}

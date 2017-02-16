@@ -14,14 +14,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <glog/logging.h>
+
 #include <iostream>
 #include <string>
+#include <random>
+#include <functional>
+
 
 #include <boost/lexical_cast.hpp>
 
 #include <mesos/resources.hpp>
 #include <mesos/scheduler.hpp>
 #include <mesos/type_utils.hpp>
+
+#include "master/constants.hpp"
 
 #include <stout/check.hpp>
 #include <stout/exit.hpp>
@@ -48,8 +55,27 @@ using std::vector;
 
 using mesos::Resources;
 
-const int32_t CPUS_PER_TASK = 1;
-const int32_t MEM_PER_TASK = 128;
+long totalTasksLaunched = 0;
+
+std::default_random_engine taskNumberGenerator;
+static const int A_PARAM = 1;
+static const int B_PARAM = 10;
+std::uniform_int_distribution<int> taskNumberDistribution(1, 10);
+auto generateTasksNumber =
+    std::bind (taskNumberDistribution, taskNumberGenerator);
+
+std::default_random_engine cpuGenerator;
+// std::uniform_int_distribution<int32_t> cpuDistribution(1,10);
+static const double LAMBDA_PARAM = 1.3;
+std::exponential_distribution<double> cpuDistribution(LAMBDA_PARAM);
+auto generateTaskCPU = std::bind (cpuDistribution, cpuGenerator);
+
+std::default_random_engine memGenerator;
+// std::uniform_int_distribution<int32_t> memDistribution(128,512);
+static const double MEAN_PARAM = 1024.0;
+static const double STDDEV_PARAM = 512.0;
+std::normal_distribution<double> memDistribution(MEAN_PARAM, STDDEV_PARAM);
+auto generateTaskMEM = std::bind (memDistribution, memGenerator);
 
 class TestScheduler : public Scheduler
 {
@@ -61,9 +87,7 @@ public:
     : implicitAcknowledgements(_implicitAcknowledgements),
       executor(_executor),
       role(_role),
-      tasksLaunched(0),
-      tasksFinished(0),
-      totalTasks(5) {}
+      tasksFinished(0) {}
 
   virtual ~TestScheduler() {}
 
@@ -78,7 +102,7 @@ public:
 
   virtual void disconnected(SchedulerDriver* driver) {}
 
-  virtual void resourceOffers(SchedulerDriver* driver,
+  /*virtual void resourceOffers(SchedulerDriver* driver,
                               const vector<Offer>& offers)
   {
     foreach (const Offer& offer, offers) {
@@ -93,8 +117,8 @@ public:
 
       // Launch tasks.
       vector<TaskInfo> tasks;
-     /* while (tasksLaunched < totalTasks &&
-             remaining.flatten().contains(TASK_RESOURCES)) {*/
+      while (tasksLaunched < totalTasks &&
+             remaining.flatten().contains(TASK_RESOURCES)) {
       if (remaining.flatten().contains(TASK_RESOURCES)) {
         int taskId = tasksLaunched++;
 
@@ -121,6 +145,93 @@ public:
       driver->launchTasks(offer.id(), tasks);
     }
   }
+*/
+
+  virtual void resourceOffers(SchedulerDriver* driver,
+                                const vector<Offer>& offers)
+    {
+      foreach (const Offer& offer, offers) {
+        LOG(INFO) << "Received offer "
+                  << offer.id() << " with "
+                  << offer.resources();
+
+        Resources remaining = offer.resources();
+
+        // Launch tasks.
+        int tasksToLaunch = generateTasksNumber();
+        LOG(INFO) << "I will try to launch " << tasksToLaunch
+                  << " tasks using offer " << offer.id();
+        int launchedTasks = 0;
+        vector<TaskInfo> tasks;
+        // FIXME tasks.reserve(tasksToLaunch);
+        while (allocatable(remaining) && launchedTasks < tasksToLaunch) {
+          int32_t cpu = static_cast<int32_t>(generateTaskCPU()) + 1;
+          int32_t mem = 0;
+          do{
+            mem = static_cast<int32_t>(generateTaskMEM());
+          }
+          while (mem < 128); // FIXME check value 128
+
+          const Resources TASK_RESOURCES = Resources::parse(
+                      "cpus:" + stringify(cpu) +
+                      ";mem:" + stringify(mem)).get();
+          LOG(INFO) << "Randomly generated task resources: " << TASK_RESOURCES;
+
+          // if(!remaining.flatten().contains(TASK_RESOURCES))
+          if(!remaining.contains(TASK_RESOURCES)) {
+            LOG(WARNING) << "Unable to launch the desired group of tasks "
+                      << "because one of them request more resources "
+                      << "than available"
+                      << " (i.e. cpu:" << cpu << " mem:" << mem << "MB "
+                      << "over remaining cpu:" << remaining.cpus().get()
+                      << " mem:" << remaining.mem().get().megabytes() << "MB)";
+            break;
+          }
+
+          launchedTasks++;
+
+          int taskId = totalTasksLaunched++;
+          TaskInfo task;
+          task.set_name("Task " + lexical_cast<string>(taskId));
+          task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
+          task.mutable_slave_id()->MergeFrom(offer.slave_id());
+          task.mutable_executor()->MergeFrom(executor);
+
+          LOG(INFO) << "Matching task ID " << taskId
+                    << " asking for cpu:" << cpu << ", mem:" << mem << "MB"
+                    << " with offer " << offer.id();
+
+          Option<Resources> resources = remaining.find(TASK_RESOURCES);
+          CHECK_SOME(resources);
+          LOG(INFO) << "Found resources needed by task: "
+                    << taskId << " : " << resources.get();
+
+          task.mutable_resources()->MergeFrom(resources.get());
+          remaining -= resources.get();
+          tasks.push_back(task);
+
+          LOG(INFO) << "Resources remaining in offer " << offer.id()
+                    << " : " << remaining;
+
+        /*
+          Try<Resources> flattened = TASK_RESOURCES.flatten(role);
+          CHECK_SOME(flattened);
+          Option<Resources> resources = remaining.find(flattened.get());
+        */
+        }
+        if(launchedTasks == tasksToLaunch)
+          driver->launchTasks(offer.id(), tasks);
+        else
+        {
+          LOG(WARNING) << "Offer refused!!! (unable to launch "
+                       << tasksToLaunch << " tasks using offer "
+                       << offer.id() << ")";
+          Filters filter;
+          filter.set_refuse_seconds(0.0);
+          driver->declineOffer(offer.id(), filter);
+        }
+      }
+    }
 
   virtual void offerRescinded(SchedulerDriver* driver,
                               const OfferID& offerId) {}
@@ -151,9 +262,9 @@ public:
       driver->acknowledgeStatusUpdate(status);
     }
 
-    if (tasksFinished == totalTasks) {
+    /*if (tasksFinished == totalTasks) {
       driver->stop();
-    }
+    }*/
   }
 
   virtual void frameworkMessage(SchedulerDriver* driver,
@@ -177,9 +288,19 @@ private:
   const bool implicitAcknowledgements;
   const ExecutorInfo executor;
   string role;
-  int tasksLaunched;
+  // int tasksLaunched;
   int tasksFinished;
-  int totalTasks;
+  // int totalTasks;
+
+  bool allocatable(
+      const Resources& resources)
+  {
+    Option<double> cpus = resources.cpus();
+    Option<Bytes> mem = resources.mem();
+
+    return (cpus.isSome() && cpus.get() >= mesos::internal::master::MIN_CPUS) ||
+           (mem.isSome() && mem.get() >= mesos::internal::master::MIN_MEM);
+  }
 };
 
 
@@ -236,6 +357,13 @@ int main(int argc, char** argv)
   foreach (const flags::Warning& warning, load->warnings) {
     LOG(WARNING) << warning.message;
   }
+
+  cout << "TEST FRAMEWORK DRFH " << endl << "Configuration:" << endl
+       << "uniform distribution for tasks number per offer with a=" << A_PARAM
+       << " and b=" << B_PARAM <<endl
+       << "exponential distribution for CPU load with lambda=" << LAMBDA_PARAM
+       << endl << "gamma distribution for MEM load with alpha=" << MEAN_PARAM
+       << " and beta=" << STDDEV_PARAM << endl;
 
   ExecutorInfo executor;
   executor.mutable_executor_id()->set_value("default");
