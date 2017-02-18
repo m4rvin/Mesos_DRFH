@@ -37,6 +37,36 @@ std::uniform_int_distribution<int> taskDurationDistribution(10, 120);
 auto generateTasksDuration =
     std::bind (taskDurationDistribution, taskDurationGenerator);
 
+void run(ExecutorDriver* driver, const TaskInfo& task)
+{
+  TaskStatus status;
+  status.mutable_task_id()->MergeFrom(task.task_id());
+  status.set_state(TASK_RUNNING);
+
+  driver->sendStatusUpdate(status);
+
+  int taskDuration = generateTasksDuration();
+  LOG(INFO) << "Task with ID: "
+            <<  task.task_id().value()
+            <<" is going to work for "
+            << taskDuration << " seconds";
+
+  // This is where one would perform the requested task.
+  os::sleep(Seconds(taskDuration));
+
+  LOG(INFO) << "Task with ID: "
+            << task.task_id().value()
+            <<  " terminated its work";
+
+  status.mutable_task_id()->MergeFrom(task.task_id());
+  status.set_state(TASK_FINISHED);
+
+  driver->sendStatusUpdate(status);
+
+  // TODO(danang) find a way to stop the driver without killing the process.
+}
+
+
 class TestExecutor : public Executor
 {
 public:
@@ -58,34 +88,6 @@ public:
 
   virtual void disconnected(ExecutorDriver* driver) {}
 
-  void run(ExecutorDriver* driver, const TaskInfo& task)
-  {
-    TaskStatus status;
-    status.mutable_task_id()->MergeFrom(task.task_id());
-    status.set_state(TASK_RUNNING);
-
-    driver->sendStatusUpdate(status);
-
-    int taskDuration = generateTasksDuration();
-    LOG(INFO) << "Task with ID: "
-              <<  task.task_id().value()
-              <<" is going to work for "
-              << taskDuration << " seconds";
-
-    // This is where one would perform the requested task.
-    os::sleep(Seconds(taskDuration));
-
-    LOG(INFO) << "Task with ID: "
-              << task.task_id().value()
-              <<  " terminated its work";
-
-    status.mutable_task_id()->MergeFrom(task.task_id());
-    status.set_state(TASK_FINISHED);
-
-    driver->sendStatusUpdate(status);
-
-    // TODO(danang) find a way to stop the driver without killing the process.
-  }
 
   virtual void launchTask(ExecutorDriver* driver, const TaskInfo& task)
   {

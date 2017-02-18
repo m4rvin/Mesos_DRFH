@@ -182,12 +182,20 @@ public:
 
           // if(!remaining.flatten().contains(TASK_RESOURCES))
           if(!remaining.contains(TASK_RESOURCES)) {
+            // It could happen that the cpu or mem field is absent if its value
+            // is 0, so we cannot simply print remaining but we have to check
+            // the fields' existence.
+            double remainingCpu = remaining.cpus().isSome() ?
+                remaining.cpus().get() : 0;
+            uint64_t remainingMem = remaining.mem().isSome() ?
+                remaining.mem().get().megabytes() : 0;
+
             LOG(WARNING) << "Unable to launch the desired group of tasks "
                       << "because one of them request more resources "
                       << "than available"
                       << " (i.e. cpu:" << cpu << " mem:" << mem << "MB "
-                      << "over remaining cpu:" << remaining.cpus().get()
-                      << " mem:" << remaining.mem().get().megabytes() << "MB)";
+                      << "over remaining cpu:" << remainingCpu
+                      << " mem:" << remainingMem << "MB)";
             break;
           }
 
@@ -322,11 +330,11 @@ int main(int argc, char** argv)
   string uri;
   Option<string> value = os::getenv("MESOS_HELPER_DIR");
   if (value.isSome()) {
-    uri = path::join(value.get(), "test-executor");
+    uri = path::join(value.get(), "test-executor-drfh");
   } else {
     uri = path::join(
         os::realpath(Path(argv[0]).dirname()).get(),
-        "test-executor");
+        "test-executor-drfh");
   }
 
   mesos::internal::logging::Flags flags;
@@ -372,7 +380,7 @@ int main(int argc, char** argv)
   executor.mutable_executor_id()->set_value("default");
   executor.mutable_command()->set_value(uri);
   executor.set_name("Test Executor DRFH (C++)");
-  executor.set_source("cpp_test");
+  // executor.set_source("cpp_test");
 
   FrameworkInfo framework;
   framework.set_user(""); // Have Mesos fill in the current user.
