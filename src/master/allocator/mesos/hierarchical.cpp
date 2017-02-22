@@ -41,6 +41,7 @@ using std::set;
 using std::string;
 using std::vector;
 using std::complex;
+using std::tuple;
 using mesos::allocator::InverseOfferStatus;
 
 using process::Failure;
@@ -130,7 +131,7 @@ public:
     createComplexResourcesRepresentation(
         HierarchicalAllocatorProcess* process,
         SlaveID slaveId,
-        std::tuple<double, uint64_t> maxResources)
+        tuple<double, uint64_t> maxResources)
   {
     ComplexResourcesRepresentation complexRR(process, slaveId, maxResources);
     // Check resources availability is not greater than 100%
@@ -167,7 +168,7 @@ private:
   ComplexResourcesRepresentation(
         HierarchicalAllocatorProcess* process,
         SlaveID slaveId,
-        std::tuple<double, uint64_t> maxResources)
+        tuple<double, uint64_t> maxResources)
   {
     // retrieve total cpu capacity from a slave
     Option<double> totalCpu = process->slaves[slaveId].total.cpus();
@@ -248,7 +249,7 @@ private:
   }
 };
 
-std::tuple<double, uint64_t>
+tuple<double, uint64_t>
 HierarchicalAllocatorProcess::findMaxResourcesCapacity(
     const vector<SlaveID>& slaveIds)
 {
@@ -268,7 +269,7 @@ HierarchicalAllocatorProcess::findMaxResourcesCapacity(
       maxMemMB = totalMem.get().megabytes();
   }
 
-  return std::tuple<double, double> (maxCpu, maxMemMB);
+  return tuple<double, double> (maxCpu, maxMemMB);
 }
 
 Option<vector<SlaveID>> HierarchicalAllocatorProcess::blindSort(
@@ -277,7 +278,7 @@ Option<vector<SlaveID>> HierarchicalAllocatorProcess::blindSort(
   VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
   if (slaveIds.size() > 0)
   {
-    std::tuple<double, uint64_t> maxResources =
+    tuple<double, uint64_t> maxResources =
         findMaxResourcesCapacity(slaveIds);
     vector<SlaveID> balancedSlaveIds;
     balancedSlaveIds.reserve(slaveIds.size());
@@ -1531,7 +1532,7 @@ void HierarchicalAllocatorProcess::allocate(
           << stopwatch.elapsed();
 }
 
-Option<std::tuple<SlaveID, Resources>>
+Option<tuple<SlaveID, Resources>>
 HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
 {
   // Randomize the order in which slaves' resources are allocated.
@@ -1550,7 +1551,7 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
   auto it = slaves.begin();
   if (it == slaves.end())
     return None();
-  Option<std::tuple<SlaveID, Resources>> selectedSlave = Some(*it);
+  Option<tuple<SlaveID, Resources>> selectedSlave = Some(*it);
   slaves.erase(it->first);
   return selectedSlave;
   // return None();
@@ -1649,7 +1650,7 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
     // Use a copy of the list of current slaves with available resources.
     hashmap<SlaveID, Resources> candidateSlavesResources (slavesResources);
     bool acceptableOffer = false;
-    Option<std::tuple<SlaveID, Resources>> selectedSlave;
+    Option<tuple<SlaveID, Resources>> selectedSlave;
     SlaveID slaveId;
     Resources resources;
 
