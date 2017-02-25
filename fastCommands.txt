@@ -26,3 +26,10 @@ GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=1
 ./test-framework-drfh --master=127.0.0.1:5050
 
 sudo ./balloon-framework --master=127.0.0.1:5050 --task_memory=128MB --task_memory_usage_limit=512MB
+
+#DEBUG
+b mesos::internal::master::Master::Master(mesos::allocator::Allocator*, mesos::internal::master::Registrar*, mesos::internal::Files*, mesos::master::contender::MasterContender*, mesos::master::detector::MasterDetector*, Option<mesos::Authorizer*> const&, Option<std::shared_ptr<process::RateLimiter> > const&, mesos::internal::master::Flags const&)
+
+b src/master/allocator/mesos/allocator.hpp:581
+
+b src/master/master.cpp:4426
