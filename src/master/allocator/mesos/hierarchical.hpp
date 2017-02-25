@@ -216,6 +216,10 @@ protected:
   std::tuple<double, uint64_t> findMaxResourcesCapacity(
       const std::vector<SlaveID>& slaveIds);
 
+  // Heuristic to get the slave with the highest Resources.
+  Option<std::tuple<SlaveID, Resources>> maxResourcesHeuristic
+    (hashmap<SlaveID, Resources>& slaves);
+
   // Idempotent helpers for pausing and resuming allocation.
   void pause();
   void resume();
