@@ -57,6 +57,8 @@ using mesos::Resources;
 
 long totalTasksLaunched = 0;
 
+static const int MAX_OFFERS_RECEIVABLE = 50;
+
 std::default_random_engine taskNumberGenerator;
 static const int A_PARAM = 1;
 static const int B_PARAM = 10;
@@ -88,7 +90,8 @@ public:
     : implicitAcknowledgements(_implicitAcknowledgements),
       executor(_executor),
       role(_role),
-      tasksFinished(0) {}
+      tasksFinished(0),
+      receivedOffers(0) {}
 
   virtual ~TestScheduler() {}
 
@@ -152,6 +155,11 @@ public:
                                 const vector<Offer>& offers)
     {
       foreach (const Offer& offer, offers) {
+        receivedOffers++;
+        if (receivedOffers > MAX_OFFERS_RECEIVABLE) {
+          driver->stop();
+        }
+
         LOG(INFO) << "Received offer "
                   << offer.id() << " with "
                   << offer.resources();
@@ -231,7 +239,11 @@ public:
         */
         }
         if(launchedTasks == tasksToLaunch)
-          driver->launchTasks(offer.id(), tasks);
+        {
+          Filters filter;
+          filter.set_refuse_seconds(0.0);
+          driver->launchTasks(offer.id(), tasks, filter);
+        }
         else
         {
           LOG(WARNING) << "Offer refused!!! (unable to launch "
@@ -302,6 +314,7 @@ private:
   // int tasksLaunched;
   int tasksFinished;
   // int totalTasks;
+  int receivedOffers;
 
   bool allocatable(
       const Resources& resources)
