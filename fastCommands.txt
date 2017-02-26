@@ -33,3 +33,5 @@ b mesos::internal::master::Master::Master(mesos::allocator::Allocator*, mesos::i
 b src/master/allocator/mesos/allocator.hpp:581
 
 b src/master/master.cpp:4426
+
+b mesos::scheduler::Call::accept
