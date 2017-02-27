@@ -57,7 +57,14 @@ using mesos::Resources;
 
 long totalTasksLaunched = 0;
 
-static const int MAX_OFFERS_RECEIVABLE = 50;
+double cpusDemand;
+Bytes memDemand;
+Resources TASK_RESOURCES;
+
+int maxOffersReceivable;
+
+static const double CPUS_PER_EXECUTOR = 0.1;
+static const int32_t MEM_PER_EXECUTOR = 32;
 
 std::default_random_engine taskNumberGenerator;
 static const int A_PARAM = 1;
@@ -91,7 +98,8 @@ public:
       executor(_executor),
       role(_role),
       tasksFinished(0),
-      receivedOffers(0) {}
+      receivedOffers(0),
+      waitingTasksNumber(0) {}
 
   virtual ~TestScheduler() {}
 
@@ -151,6 +159,7 @@ public:
   }
 */
 
+/*
   virtual void resourceOffers(SchedulerDriver* driver,
                                 const vector<Offer>& offers)
     {
@@ -232,17 +241,104 @@ public:
           LOG(INFO) << "Resources remaining in offer " << offer.id()
                     << " : " << remaining;
 
-        /*
+
           Try<Resources> flattened = TASK_RESOURCES.flatten(role);
           CHECK_SOME(flattened);
           Option<Resources> resources = remaining.find(flattened.get());
-        */
+
         }
         if(launchedTasks == tasksToLaunch)
         {
           Filters filter;
           filter.set_refuse_seconds(0.0);
           driver->launchTasks(offer.id(), tasks, filter);
+        }
+        else
+        {
+          LOG(WARNING) << "Offer refused!!! (unable to launch "
+                       << tasksToLaunch << " tasks using offer "
+                       << offer.id() << ")";
+          Filters filter;
+          filter.set_refuse_seconds(0.0);
+          driver->declineOffer(offer.id(), filter);
+        }
+      }
+    }
+*/
+
+  virtual void resourceOffers(SchedulerDriver* driver,
+                                const vector<Offer>& offers)
+    {
+      foreach (const Offer& offer, offers) {
+        receivedOffers++;
+        if (receivedOffers > maxOffersReceivable) {
+          driver->stop();
+        }
+
+        LOG(INFO) << "Received offer "
+                  << offer.id() << " with "
+                  << offer.resources();
+
+        Resources remaining = offer.resources();
+
+        // Launch tasks.
+        int tasksToLaunch = waitingTasksNumber != 0
+            ? waitingTasksNumber : generateTasksNumber();
+
+        LOG(INFO) << "I will try to launch " << tasksToLaunch
+                  << " tasks using offer " << offer.id();
+
+        int launchableTasks = 0;
+        vector<TaskInfo> tasks;
+        tasks.reserve(tasksToLaunch);
+
+        while (allocatable(remaining) && launchableTasks < tasksToLaunch) {
+          if(!remaining.contains(TASK_RESOURCES)) {
+            /*
+            // It could happen that the cpu or mem field is absent if its value
+            // is 0, so we cannot simply print remaining but we have to check
+            // the fields' existence.
+            double remainingCpu = remaining.cpus().isSome() ?
+                remaining.cpus().get() : 0;
+            uint64_t remainingMem = remaining.mem().isSome() ?
+                remaining.mem().get().megabytes() : 0;
+            */
+            break;
+          }
+
+          launchableTasks++;
+
+          int taskId = totalTasksLaunched + launchableTasks;
+          TaskInfo task;
+          task.set_name("Task " + lexical_cast<string>(taskId));
+          task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
+          task.mutable_slave_id()->MergeFrom(offer.slave_id());
+          task.mutable_executor()->MergeFrom(executor);
+
+          LOG(INFO) << "Matching task ID " << taskId
+                    << " asking for cpu:" << cpusDemand
+                    << ", mem:" << memDemand.megabytes() << "MB"
+                    << " with offer " << offer.id();
+
+          Option<Resources> resources = remaining.find(TASK_RESOURCES);
+          CHECK_SOME(resources);
+         /* LOG(INFO) << "Found resources needed by task: "
+                    << taskId << " : " << resources.get();*/
+
+          task.mutable_resources()->MergeFrom(resources.get());
+          remaining -= resources.get();
+          tasks.push_back(task);
+
+          LOG(INFO) << "Resources remaining in offer " << offer.id()
+                    << " : " << remaining;
+        }
+        if(launchableTasks == tasksToLaunch)
+        {
+          Filters filter;
+          filter.set_refuse_seconds(0.0);
+          driver->launchTasks(offer.id(), tasks, filter);
+
+          totalTasksLaunched += launchableTasks;
         }
         else
         {
@@ -315,6 +411,7 @@ private:
   int tasksFinished;
   // int totalTasks;
   int receivedOffers;
+  int waitingTasksNumber;
 
   bool allocatable(
       const Resources& resources)
@@ -363,6 +460,51 @@ int main(int argc, char** argv)
             "master",
             "ip:port of master to connect");
 
+  flags.add(&memDemand,
+          "task_memory_demand",
+          None(),
+          "Size, in bytes (i.e. B, MB, GB, ...), of each task's memory demand.",
+          static_cast<const Bytes*>(nullptr),
+          [](const Bytes& value) -> Option<Error> {
+            if (value.megabytes() < MEM_PER_EXECUTOR) {
+              return Error(
+                  "Please use a --task_memory_demand greater than " +
+                  stringify(MEM_PER_EXECUTOR) + " MB");
+            }
+            return None();
+          });
+
+
+  flags.add(&cpusDemand,
+         "task_cpus_demand",
+         None(),
+         "How much cpus each task will require.",
+         static_cast<const double*>(nullptr),
+         [](const double& value) -> Option<Error> {
+           if (value < CPUS_PER_EXECUTOR) {
+             return Error(
+                 "Please use a --task_cpus_demand greater than " +
+                 stringify(CPUS_PER_EXECUTOR));
+           }
+           return None();
+         });
+
+  flags.add(&maxOffersReceivable,
+         "offers_limit",
+         None(),
+         "How many offers to process before asking to stop the driver and "
+         "close the framework.",
+         static_cast<const int*>(nullptr),
+         [](const int& value) -> Option<Error> {
+           if (value <= 0) {
+             return Error(
+                 "Please use a --offers_limit greater than " +
+                 stringify(0));
+           }
+           return None();
+         });
+
+
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
   if (load.isError()) {
@@ -374,6 +516,12 @@ int main(int argc, char** argv)
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
   }
+
+  TASK_RESOURCES = Resources::parse(
+              "cpus:" + stringify(cpusDemand) +
+              ";mem:" + stringify(memDemand.megabytes())).get();
+
+  LOG(INFO) << "Task resources for this framework will be: " << TASK_RESOURCES;
 
   internal::logging::initialize(argv[0], flags, true); // Catch signals.
 
