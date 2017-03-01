@@ -6,6 +6,7 @@ mkdir build && cd build
 
 ../configure --prefix=/opt/mesos --disable-python --disable-java
 CFLAGS=-ggdb3 CXXFLAGS=-ggdb3 ../configure --prefix=/opt/mesos --disable-python --disable-java --enable-debug
+../configure --prefix=/opt/mesos --disable-python --disable-java --enable-optimize
 
 make -j4
 
