@@ -38,3 +38,6 @@ missing
 .cproject
 .project
 .settings/*
+
+# Various
+clusterNodesPids
