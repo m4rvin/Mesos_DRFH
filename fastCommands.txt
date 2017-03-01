@@ -25,6 +25,7 @@ GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=1
 ./mesos-agent.sh --master=127.0.0.1:5050 --work_dir=/tmp/mesos/agent2 --no-systemd_enable_support --log_dir=/tmp/mesosLog/agent2 --resources="cpus:2;mem:512" --advertise_port=5052 --port=5052
 
 ./test-framework-drfh --master=127.0.0.1:5050
+./test-framework-drfh --master=127.0.0.1:5050 --task_cpus_demand=1.1 --task_memory_demand=64MB --offers_limit=200
 
 sudo ./balloon-framework --master=127.0.0.1:5050 --task_memory=128MB --task_memory_usage_limit=512MB
 
