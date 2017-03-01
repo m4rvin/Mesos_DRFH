@@ -272,13 +272,18 @@ public:
   virtual void resourceOffers(SchedulerDriver* driver,
                                 const vector<Offer>& offers)
   {
+    // Iterable list with received offers.
+    list<Offer> offerList;
     foreach (Offer offer, offers) {
       LOG(INFO) << "Received offer " << offer.id()
                 << " with " << offer.resources();
       receivedOffers++;
+
+      if (receivedOffers <= maxOffersReceivable)
+        offerList.push_back(offer);
     }
-    // Iterable list with received offers.
-    list<Offer> offerList (offers.begin(), offers.end());
+
+    // offerList = list<Offer> (offers.begin(), offers.end());
 
     /*
     // Count offers and remove the ones with non allocatable resources.
@@ -308,6 +313,8 @@ public:
 
     if (offerList.empty()) {
       LOG(WARNING) << "No offer received.";
+      if (receivedOffers >= maxOffersReceivable)
+        driver->stop();
       return;
     }
 
@@ -416,7 +423,7 @@ public:
         driver->declineOffer(offer.id(), filter);
       }
     }
-    if (receivedOffers > maxOffersReceivable)
+    if (receivedOffers >= maxOffersReceivable)
       driver->stop();
   }
 
