@@ -66,6 +66,9 @@ using mesos::Resources;
 std::mutex _lock;
 uint64_t queuedTasksNumber = 0;
 
+int receivedOffers = 0;
+int totalOffersReceived = 0;
+
 uint64_t totalTasksLaunched = 0;
 uint64_t totalOffersDeclined = 0;
 uint64_t totalOffersAccepted = 0;
@@ -146,12 +149,14 @@ void printTotalStats()
 {
   LOG(INFO) << endl
             << "Total tasks launched = "   << totalTasksLaunched   << endl
+            << "Total offers received = "  << totalOffersReceived  << endl
             << "Total offers declined = "  << totalOffersDeclined  << endl
             << "Total offers accepted = "  << totalOffersAccepted  << endl
             << "Total offers unused = "    << totalOffersUnused;
 }
 
 void resetStats() {
+  receivedOffers  = 0;
   tasksLaunched   = 0;
   offersDeclined  = 0;
   offersAccepted  = 0;
@@ -161,8 +166,9 @@ void resetStats() {
 void printStats()
 {
   LOG(INFO) << endl
-            << "Allocation run#" << allocationRunNumber << endl
+            << "Allocation run#"     << allocationRunNumber << endl
             << "Tasks launched = "   << tasksLaunched   << endl
+            << "Offers received= "   << receivedOffers  << endl
             << "Offers declined = "  << offersDeclined  << endl
             << "Offers accepted = "  << offersAccepted  << endl
             << "Offers unused = "    << offersUnused;
@@ -177,7 +183,8 @@ void printOnFile() {
   if (!myfile.is_open())
     LOG(ERROR) << "Error opening the file to ouptut stats.";
   else {
-    myfile << offersDeclined << " "
+    myfile << receivedOffers << " "
+           << offersDeclined << " "
            << offersAccepted << " "
            << offersUnused << endl;
     myfile.close();
@@ -196,7 +203,6 @@ public:
       executor(_executor),
       role(_role),
       tasksFinished(0),
-      receivedOffers(0),
       waitingTasksNumber(0) {}
 
   virtual ~TestScheduler() {}
@@ -218,7 +224,9 @@ public:
     allocationRunNumber++;
     foreach (const Offer& offer, offers) {
       receivedOffers++;
-      if (receivedOffers > maxOffersReceivable) {
+      totalOffersReceived++;
+
+      if (totalOffersReceived > maxOffersReceivable) {
         driver->stop();
       }
 
@@ -353,7 +361,6 @@ private:
   // int tasksLaunched;
   int tasksFinished;
   // int totalTasks;
-  int receivedOffers;
   int waitingTasksNumber;
 
   bool allocatable(
