@@ -32,9 +32,15 @@ using std::endl;
 using std::string;
 
 std::default_random_engine taskDurationGenerator;
+
+// Task duration distributions
 std::lognormal_distribution<double>
   taskDurationLogNormDistribution60(4.064, 0.25);
+std::exponential_distribution<double> taskNumberExpDistribution05(0.5);
 
+// Task duration generators
+
+/*
 // Get the task duration from an lognormal distribution with m=4.064,s=0.25.
 // The mean value is about 60.
 // Return values in [0, +inf).
@@ -42,6 +48,20 @@ uint64_t generateLognormalTasksDuration60()
 {
   return static_cast<uint64_t>
     (taskDurationLogNormDistribution60(taskDurationGenerator));
+}
+*/
+
+// Get the task duration from an exponential distribution with u=0.5.
+// Return values in [shift, +inf).
+uint64_t generateExpTasksDuration05(uint64_t shift)
+{
+  double value = taskNumberExpDistribution05(taskDurationGenerator);
+    return static_cast<uint64_t>(value + shift);
+}
+
+uint64_t getTaskDuration()
+{
+  return generateExpTasksDuration05(10);
 }
 
 void run(ExecutorDriver* driver, const TaskInfo& task)
@@ -52,7 +72,7 @@ void run(ExecutorDriver* driver, const TaskInfo& task)
 
   driver->sendStatusUpdate(status);
 
-  uint64_t taskDuration = generateLognormalTasksDuration60();
+  uint64_t taskDuration = getTaskDuration();
   LOG(INFO) << "Task with ID: "
             <<  task.task_id().value()
             <<" is going to work for "

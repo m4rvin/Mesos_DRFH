@@ -93,20 +93,38 @@ static const int32_t MEM_PER_EXECUTOR = 32;
 std::default_random_engine taskNumberGenerator;
 std::default_random_engine tasksInterarrivalTimeGenerator;
 
+// Tasks number distributions
 std::exponential_distribution<double> taskNumberExpDistribution05(0.5);
+std::uniform_int_distribution<uint64_t>
+  taskNumberUniformDistribution1_10(1, 10);
 
-// Get a tasks number from an exponential distribution with u=0.5.
-// Return values in [5, +inf).
-uint64_t generateExponentialTasksNumber05_5()
-{
-  double value = taskNumberExpDistribution05(taskNumberGenerator);
-  return static_cast<uint64_t>(value + 5);
-}
-
+// Interarrival time distributions
 std::lognormal_distribution<double>
   tasksInterarrivalTimeLogNormDistribution60(4.064, 0.25);
 
-// Get the task duration from an lognormal distribution with m=4.064,s=0.25.
+// Tasks number generators
+
+/*
+// Get a tasks number from an exponential distribution with u=0.5.
+// Return values in [shift, +inf).
+uint64_t generateExponentialTasksNumber05(uint64_t shift)
+{
+  double value = taskNumberExpDistribution05(taskNumberGenerator);
+  return static_cast<uint64_t>(value + shift);
+}
+*/
+
+// Get a tasks number from a uniform distribution [1, 10].
+uint64_t generateUniformTasksNumber1_10()
+{
+  return taskNumberUniformDistribution1_10(taskNumberGenerator);
+}
+
+// Interarrival time generators
+
+/*
+// Get the task interarrival time from an lognormal distribution
+// with m=4.064,s=0.25.
 // The mean value is about 60.
 // Return values in [0, +inf).
 uint64_t generateLognormalTasksInterarrivalTime60()
@@ -117,9 +135,28 @@ uint64_t generateLognormalTasksInterarrivalTime60()
 
   return value * 60;
 }
+*/
+
+// Get a tasks number from an exponential distribution with u=0.5.
+// Return values in [shift, +inf).
+uint64_t generateExponentialTasksInterarrivalTime05(uint64_t shift)
+{
+  double value = taskNumberExpDistribution05(taskNumberGenerator);
+  return static_cast<uint64_t>(value + shift);
+}
+
+uint64_t generateTasksNumber()
+{
+  return generateUniformTasksNumber1_10();
+}
+
+uint64_t generateTasksInterarrivalTime()
+{
+  return generateExponentialTasksInterarrivalTime05(3);
+}
 
 uint64_t fillTasksList() {
-  uint64_t newTasks = generateExponentialTasksNumber05_5();
+  uint64_t newTasks = generateTasksNumber();
   _lock.lock();
   queuedTasksNumber += newTasks;
   _lock.unlock();
@@ -390,7 +427,7 @@ void run()
   while (true) {
     LOG(INFO) << "New tasks queued="   << fillTasksList();
     LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
-    os::sleep(Seconds(generateLognormalTasksInterarrivalTime60()));
+    os::sleep(Seconds(generateTasksInterarrivalTime()));
   }
 }
 
