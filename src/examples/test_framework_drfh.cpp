@@ -21,6 +21,11 @@
 #include <random>
 #include <functional>
 #include <list>
+#include <thread>
+#include <mutex>
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
 
 
 #include <boost/lexical_cast.hpp>
@@ -58,13 +63,28 @@ using std::list;
 
 using mesos::Resources;
 
-long totalTasksLaunched = 0;
+std::mutex _lock;
+uint64_t queuedTasksNumber = 0;
+
+// long totalTasksLaunched = 0;
+uint64_t totalTasksLaunched = 0;
+uint64_t totalOffersDeclined = 0;
+uint64_t totalOffersAccepted = 0;
+uint64_t totalOffersUnused = 0;
+
+uint64_t allocationRunNumber = 0;
+uint64_t tasksLaunched = 0;
+uint64_t offersDeclined = 0;
+uint64_t offersAccepted = 0;
+uint64_t offersUnused = 0;
+
 
 double cpusTaskDemand;
 Bytes memTaskDemand;
 Resources TASK_RESOURCES;
 
 int maxOffersReceivable;
+Option<string> statsFilepath;
 
 static const double CPUS_PER_EXECUTOR = 0.1;
 static const int32_t MEM_PER_EXECUTOR = 32;
@@ -72,9 +92,14 @@ static const int32_t MEM_PER_EXECUTOR = 32;
 std::default_random_engine taskNumberGenerator;
 static const int A_PARAM = 1;
 static const int B_PARAM = 10;
+/*
 std::uniform_int_distribution<int> taskNumberDistribution(1, 10);
 auto generateTasksNumber =
     std::bind (taskNumberDistribution, taskNumberGenerator);
+*/
+std::uniform_int_distribution<uint64_t> taskNumberDistributionUint64(1, 10);
+auto generateTasksNumberUint64 =
+    std::bind (taskNumberDistributionUint64, taskNumberGenerator);
 
 std::default_random_engine cpuGenerator;
 // std::uniform_int_distribution<int32_t> cpuDistribution(1,10);
@@ -89,6 +114,76 @@ static const double MEAN_PARAM = 1024.0;
 static const double STDDEV_PARAM = 512.0;
 std::normal_distribution<double> memDistribution(MEAN_PARAM, STDDEV_PARAM);
 auto generateTaskMEM = std::bind (memDistribution, memGenerator);
+
+
+void fillTasksList() {
+  _lock.lock();
+  queuedTasksNumber += generateTasksNumberUint64();
+  _lock.unlock();
+}
+
+void dequeueTaskFromList() {
+  _lock.lock();
+  queuedTasksNumber -= 1;
+  _lock.unlock();
+}
+
+void requeueTaskIntoList() {
+  _lock.lock();
+  queuedTasksNumber += 1;
+  _lock.unlock();
+}
+
+uint64_t getQueuedTasks() {
+  _lock.lock();
+  uint64_t  value = queuedTasksNumber;
+  _lock.unlock();
+
+  return value;
+}
+
+void printTotalStats()
+{
+  LOG(INFO) << endl
+            << "Total tasks launched = "   << totalTasksLaunched   << endl
+            << "Total offers declined = "  << totalOffersDeclined  << endl
+            << "Total offers accepted = "  << totalOffersAccepted  << endl
+            << "Total offers unused = "    << totalOffersUnused;
+}
+
+void resetStats() {
+  tasksLaunched   = 0;
+  offersDeclined  = 0;
+  offersAccepted  = 0;
+  offersUnused    = 0;
+}
+
+void printStats()
+{
+  LOG(INFO) << endl
+            << "Allocation run#" << allocationRunNumber << endl
+            << "Tasks launched = "   << tasksLaunched   << endl
+            << "Offers declined = "  << offersDeclined  << endl
+            << "Offers accepted = "  << offersAccepted  << endl
+            << "Offers unused = "    << offersUnused;
+}
+
+void printOnFile() {
+  if (statsFilepath.isNone())
+    return;
+
+  std::ofstream myfile;
+  myfile.open (statsFilepath.get(),  std::ofstream::app);
+  if (!myfile.is_open())
+    LOG(ERROR) << "Error opening the file to ouptut stats.";
+  else {
+    myfile << offersDeclined << " "
+           << offersAccepted << " "
+           << offersUnused << endl;
+    myfile.close();
+  }
+}
+
 
 class TestScheduler : public Scheduler
 {
@@ -269,6 +364,7 @@ public:
     }
 */
 
+/*
   virtual void resourceOffers(SchedulerDriver* driver,
                                 const vector<Offer>& offers)
   {
@@ -285,7 +381,7 @@ public:
 
     // offerList = list<Offer> (offers.begin(), offers.end());
 
-    /*
+
     // Count offers and remove the ones with non allocatable resources.
     for (list<Offer>::iterator it=offerList.begin(); it != offerList.end(); ++it) {
       // Copy the offer to safely remove it from the list while iterating.
@@ -309,7 +405,7 @@ public:
       }
       receivedOffers++;
     }
-    */
+
 
     if (offerList.empty()) {
       LOG(WARNING) << "No offer received.";
@@ -426,6 +522,90 @@ public:
     if (receivedOffers >= maxOffersReceivable)
       driver->stop();
   }
+  */
+
+  virtual void resourceOffers(SchedulerDriver* driver,
+                                const vector<Offer>& offers)
+  {
+    allocationRunNumber++;
+    foreach (const Offer& offer, offers) {
+      receivedOffers++;
+      if (receivedOffers > maxOffersReceivable) {
+        driver->stop();
+      }
+
+      LOG(INFO) << "Received offer "
+                << offer.id() << " with "
+                << offer.resources();
+
+      Resources remaining = offer.resources();
+
+      // Launch tasks.
+      vector<TaskInfo> tasksToLaunch;
+      tasksToLaunch.reserve(10);
+      bool insufficientResources = false;
+
+      while (getQueuedTasks() > 0 && allocatable(remaining)) {
+        dequeueTaskFromList();
+        if (remaining.contains(TASK_RESOURCES)) {
+          tasksLaunched++;
+          uint64_t taskId = totalTasksLaunched++;
+          TaskInfo task;
+          task.set_name("Task " + lexical_cast<string>(taskId));
+          task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
+          task.mutable_slave_id()->MergeFrom(offer.slave_id());
+          task.mutable_executor()->MergeFrom(executor);
+
+          LOG(INFO) << "Matching task ID " << taskId
+                   << " asking for cpu:" << cpusTaskDemand << ", mem:"
+                   << memTaskDemand.megabytes() << "MB"
+                   << " with offer " << offer.id();
+
+          Option<Resources> resources = remaining.find(TASK_RESOURCES);
+          CHECK_SOME(resources);
+
+          task.mutable_resources()->MergeFrom(resources.get());
+          remaining -= resources.get();
+          tasksToLaunch.push_back(task);
+
+          LOG(INFO) << "Resources remaining in offer " << offer.id()
+                   << " : " << remaining;
+        }
+        else {
+          requeueTaskIntoList();
+          insufficientResources = true;
+          break;
+        }
+      }
+      if (!tasksToLaunch.empty()) {
+        offersAccepted++;
+        totalOffersAccepted++;
+        Filters filter;
+        filter.set_refuse_seconds(0.0);
+        driver->launchTasks(offer.id(), tasksToLaunch, filter);
+      }
+      else {
+        if (insufficientResources) {
+          offersDeclined++;
+          totalOffersDeclined++;
+          LOG(WARNING) << "Offer refused!!! (unable to launch tasks"
+                       << " using offer " << offer.id() << " )";
+        }
+        else {
+          offersUnused++;
+          totalOffersUnused++;
+          LOG(WARNING) << "Offer refused!!! (no task scheduled to start)";
+        }
+        Filters filter;
+        filter.set_refuse_seconds(0.0);
+        driver->declineOffer(offer.id(), filter);
+      }
+    }
+    printStats();
+    printOnFile();
+    resetStats();
+    printTotalStats();
+  }
 
   virtual void offerRescinded(SchedulerDriver* driver,
                               const OfferID& offerId) {}
@@ -509,6 +689,16 @@ void usage(const char* argv0, const flags::FlagsBase& flags)
 }
 
 
+void run()
+{
+  while (true) {
+    LOG(INFO) << "New tasks queued.";
+    fillTasksList();
+    LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
+    os::sleep(Seconds(2));
+  }
+}
+
 int main(int argc, char** argv)
 {
   // Find this executable's directory to locate executor.
@@ -579,6 +769,12 @@ int main(int argc, char** argv)
            return None();
          });
 
+  flags.add(&statsFilepath,
+         "offers_stats_file",
+         "The absolute filepath (i.e. /path/filename) to the file where to "
+         "write stats. NB: if not specified no stats will be printed on file."
+         );
+
 
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
@@ -590,6 +786,11 @@ int main(int argc, char** argv)
     cerr << "Missing --master" << endl;
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
+  }
+
+  if (statsFilepath.isSome()) {
+    if (remove(statsFilepath.get().c_str()) == 0 )
+      LOG(INFO) << "File " << statsFilepath.get() << " successfully deleted";
   }
 
   TASK_RESOURCES = Resources::parse(
@@ -676,6 +877,11 @@ int main(int argc, char** argv)
         master.get(),
         implicitAcknowledgements);
   }
+
+  std::thread thread([=]() {
+       run();
+     });
+  thread.detach();
 
   int status = driver->run() == DRIVER_STOPPED ? 0 : 1;
 
