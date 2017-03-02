@@ -27,7 +27,6 @@
 #include <fstream>
 #include <stdio.h>
 
-
 #include <boost/lexical_cast.hpp>
 
 #include <mesos/resources.hpp>
@@ -48,6 +47,7 @@
 #include "logging/flags.hpp"
 #include "logging/logging.hpp"
 
+
 using namespace mesos;
 
 using boost::lexical_cast;
@@ -60,13 +60,12 @@ using std::string;
 using std::vector;
 using std::list;
 
-
 using mesos::Resources;
+
 
 std::mutex _lock;
 uint64_t queuedTasksNumber = 0;
 
-// long totalTasksLaunched = 0;
 uint64_t totalTasksLaunched = 0;
 uint64_t totalOffersDeclined = 0;
 uint64_t totalOffersAccepted = 0;
@@ -82,7 +81,6 @@ uint64_t offersUnused = 0;
 double cpusTaskDemand;
 Bytes memTaskDemand;
 Resources TASK_RESOURCES;
-
 int maxOffersReceivable;
 Option<string> statsFilepath;
 
@@ -90,31 +88,9 @@ static const double CPUS_PER_EXECUTOR = 0.1;
 static const int32_t MEM_PER_EXECUTOR = 32;
 
 std::default_random_engine taskNumberGenerator;
-static const int A_PARAM = 1;
-static const int B_PARAM = 10;
-/*
-std::uniform_int_distribution<int> taskNumberDistribution(1, 10);
-auto generateTasksNumber =
-    std::bind (taskNumberDistribution, taskNumberGenerator);
-*/
 std::uniform_int_distribution<uint64_t> taskNumberDistributionUint64(1, 10);
 auto generateTasksNumberUint64 =
     std::bind (taskNumberDistributionUint64, taskNumberGenerator);
-
-std::default_random_engine cpuGenerator;
-// std::uniform_int_distribution<int32_t> cpuDistribution(1,10);
-static const double LAMBDA_PARAM = 1.3;
-std::exponential_distribution<double> cpuDistribution(LAMBDA_PARAM);
-// NB: the following will generate numbers starting from 0, so add +1.
-auto generateTaskCPU = std::bind (cpuDistribution, cpuGenerator);
-
-std::default_random_engine memGenerator;
-// std::uniform_int_distribution<int32_t> memDistribution(128,512);
-static const double MEAN_PARAM = 1024.0;
-static const double STDDEV_PARAM = 512.0;
-std::normal_distribution<double> memDistribution(MEAN_PARAM, STDDEV_PARAM);
-auto generateTaskMEM = std::bind (memDistribution, memGenerator);
-
 
 void fillTasksList() {
   _lock.lock();
@@ -211,318 +187,6 @@ public:
   virtual void reregistered(SchedulerDriver*, const MasterInfo& masterInfo) {}
 
   virtual void disconnected(SchedulerDriver* driver) {}
-
-  /*virtual void resourceOffers(SchedulerDriver* driver,
-                              const vector<Offer>& offers)
-  {
-    foreach (const Offer& offer, offers) {
-      cout << "Received offer " << offer.id() << " with " << offer.resources()
-           << endl;
-
-      static const Resources TASK_RESOURCES = Resources::parse(
-          "cpus:" + stringify(CPUS_PER_TASK) +
-          ";mem:" + stringify(MEM_PER_TASK)).get();
-
-      Resources remaining = offer.resources();
-
-      // Launch tasks.
-      vector<TaskInfo> tasks;
-      while (tasksLaunched < totalTasks &&
-             remaining.flatten().contains(TASK_RESOURCES)) {
-      if (remaining.flatten().contains(TASK_RESOURCES)) {
-        int taskId = tasksLaunched++;
-
-        cout << "Launching task " << taskId << " using offer "
-             << offer.id() << endl;
-
-        TaskInfo task;
-        task.set_name("Task " + lexical_cast<string>(taskId));
-        task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
-        task.mutable_slave_id()->MergeFrom(offer.slave_id());
-        task.mutable_executor()->MergeFrom(executor);
-
-        Try<Resources> flattened = TASK_RESOURCES.flatten(role);
-        CHECK_SOME(flattened);
-        Option<Resources> resources = remaining.find(flattened.get());
-
-        CHECK_SOME(resources);
-        task.mutable_resources()->MergeFrom(resources.get());
-        remaining -= resources.get();
-
-        tasks.push_back(task);
-      }
-
-      driver->launchTasks(offer.id(), tasks);
-    }
-  }
-*/
-
-/*
-  virtual void resourceOffers(SchedulerDriver* driver,
-                                const vector<Offer>& offers)
-    {
-      foreach (const Offer& offer, offers) {
-        receivedOffers++;
-        if (receivedOffers > MAX_OFFERS_RECEIVABLE) {
-          driver->stop();
-        }
-
-        LOG(INFO) << "Received offer "
-                  << offer.id() << " with "
-                  << offer.resources();
-
-        Resources remaining = offer.resources();
-
-        // Launch tasks.
-        int tasksToLaunch = generateTasksNumber();
-        LOG(INFO) << "I will try to launch " << tasksToLaunch
-                  << " tasks using offer " << offer.id();
-        int launchedTasks = 0;
-        vector<TaskInfo> tasks;
-        // FIXME tasks.reserve(tasksToLaunch);
-
-        while (allocatable(remaining) && launchedTasks < tasksToLaunch) {
-          int32_t cpu = static_cast<int32_t>(generateTaskCPU()) + 1;
-          CHECK(cpu > 0);
-          int32_t mem = 0;
-          do{
-            mem = static_cast<int32_t>(generateTaskMEM());
-          }
-          while (mem < 128); // FIXME check value 128
-
-          const Resources TASK_RESOURCES = Resources::parse(
-                      "cpus:" + stringify(cpu) +
-                      ";mem:" + stringify(mem)).get();
-          LOG(INFO) << "Randomly generated task resources: " << TASK_RESOURCES;
-
-          // if(!remaining.flatten().contains(TASK_RESOURCES))
-          if(!remaining.contains(TASK_RESOURCES)) {
-            // It could happen that the cpu or mem field is absent if its value
-            // is 0, so we cannot simply print remaining but we have to check
-            // the fields' existence.
-            double remainingCpu = remaining.cpus().isSome() ?
-                remaining.cpus().get() : 0;
-            uint64_t remainingMem = remaining.mem().isSome() ?
-                remaining.mem().get().megabytes() : 0;
-
-            LOG(WARNING) << "Unable to launch the desired group of tasks "
-                      << "because one of them request more resources "
-                      << "than available"
-                      << " (i.e. cpu:" << cpu << " mem:" << mem << "MB "
-                      << "over remaining cpu:" << remainingCpu
-                      << " mem:" << remainingMem << "MB)";
-            break;
-          }
-
-          launchedTasks++;
-
-          int taskId = totalTasksLaunched++;
-          TaskInfo task;
-          task.set_name("Task " + lexical_cast<string>(taskId));
-          task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
-          task.mutable_slave_id()->MergeFrom(offer.slave_id());
-          task.mutable_executor()->MergeFrom(executor);
-
-          LOG(INFO) << "Matching task ID " << taskId
-                    << " asking for cpu:" << cpu << ", mem:" << mem << "MB"
-                    << " with offer " << offer.id();
-
-          Option<Resources> resources = remaining.find(TASK_RESOURCES);
-          CHECK_SOME(resources);
-          LOG(INFO) << "Found resources needed by task: "
-                    << taskId << " : " << resources.get();
-
-          task.mutable_resources()->MergeFrom(resources.get());
-          remaining -= resources.get();
-          tasks.push_back(task);
-
-          LOG(INFO) << "Resources remaining in offer " << offer.id()
-                    << " : " << remaining;
-
-
-          Try<Resources> flattened = TASK_RESOURCES.flatten(role);
-          CHECK_SOME(flattened);
-          Option<Resources> resources = remaining.find(flattened.get());
-
-        }
-        if(launchedTasks == tasksToLaunch)
-        {
-          Filters filter;
-          filter.set_refuse_seconds(0.0);
-          driver->launchTasks(offer.id(), tasks, filter);
-        }
-        else
-        {
-          LOG(WARNING) << "Offer refused!!! (unable to launch "
-                       << tasksToLaunch << " tasks using offer "
-                       << offer.id() << ")";
-          Filters filter;
-          filter.set_refuse_seconds(0.0);
-          driver->declineOffer(offer.id(), filter);
-        }
-      }
-    }
-*/
-
-/*
-  virtual void resourceOffers(SchedulerDriver* driver,
-                                const vector<Offer>& offers)
-  {
-    // Iterable list with received offers.
-    list<Offer> offerList;
-    foreach (Offer offer, offers) {
-      LOG(INFO) << "Received offer " << offer.id()
-                << " with " << offer.resources();
-      receivedOffers++;
-
-      if (receivedOffers <= maxOffersReceivable)
-        offerList.push_back(offer);
-    }
-
-    // offerList = list<Offer> (offers.begin(), offers.end());
-
-
-    // Count offers and remove the ones with non allocatable resources.
-    for (list<Offer>::iterator it=offerList.begin(); it != offerList.end(); ++it) {
-      // Copy the offer to safely remove it from the list while iterating.
-      // TODO(danang) Maybe unnecessary
-      Offer offer(*it);
-      Resources resources = offer.resources();
-      if (!allocatable(resources)) {
-        LOG(WARNING) << "Declining offer with non allocatable resources: "
-                     << resources;
-        Filters filter;
-        filter.set_refuse_seconds(0.0);
-        driver->declineOffer(offer.id(), filter);
-
-        // TODO(danang) track this kind of refusal?
-
-        it = offerList.erase(it);
-      }
-      else {
-        LOG(INFO) << "Received offer " << offer.id() << " with "
-                  << offer.resources();
-      }
-      receivedOffers++;
-    }
-
-
-    if (offerList.empty()) {
-      LOG(WARNING) << "No offer received.";
-      if (receivedOffers >= maxOffersReceivable)
-        driver->stop();
-      return;
-    }
-
-    vector<int> tasksGroups;
-    tasksGroups.reserve(offerList.size());
-    vector<int> notStartedTasksGroups;
-
-    // Generate as many groups of tasks as how many allocatable offers
-    // you received (i.e. the ones remaining in offerList).
-    // This way no offer is refused because it lacks a group to match with.
-    for(int i = 0; i < static_cast<int>(offerList.size()); i++)
-      tasksGroups.push_back(generateTasksNumber());
-
-    // For each group of tasks look for the first-fit offer and match with it.
-    foreach (const int& tasksNumber, tasksGroups) {
-      bool foundFirstFitOffer = false;
-      auto it = offerList.begin();
-
-      // Iterate over the list of offers in the order received.
-      while (!foundFirstFitOffer && it != offerList.end()) {
-        double cpusGroupDemand  = cpusTaskDemand            * tasksNumber;
-        uint64_t memGroupDemand = memTaskDemand.megabytes() * tasksNumber;
-
-        Resources tasksGroupResources = Resources::parse(
-                    "cpus:" + stringify(cpusGroupDemand) +
-                    ";mem:" +
-                    stringify(memGroupDemand)).get();
-
-        // Copy the offer to safely remove it from the list while iterating.
-        // TODO(danang) Maybe unnecessary
-        Offer offer (*it);
-        Resources offerResources = offer.resources();
-
-        LOG(INFO) << "Checking if a group of tasks with total "
-                  << tasksGroupResources
-                  << " fits into offer with id " << offer.id();
-
-        if (offerResources.contains(tasksGroupResources)) {
-          int preparedTasksNumber = 0;
-          vector<TaskInfo> tasksToLaunch;
-          tasksToLaunch.reserve(tasksNumber);
-          Resources remaining = offerResources;
-
-          while (allocatable(remaining) && preparedTasksNumber < tasksNumber) {
-           int taskId = totalTasksLaunched + preparedTasksNumber;
-           TaskInfo task;
-           task.set_name("Task " + lexical_cast<string>(taskId));
-           task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
-           task.mutable_slave_id()->MergeFrom(offer.slave_id());
-           task.mutable_executor()->MergeFrom(executor);
-
-           LOG(INFO) << "Matching task ID " << taskId
-                     << " asking for cpu:" << cpusTaskDemand << ", mem:"
-                     << memTaskDemand.megabytes() << "MB"
-                     << " with offer " << offer.id();
-
-           Option<Resources> resources = remaining.find(TASK_RESOURCES);
-           CHECK_SOME(resources);
-
-           task.mutable_resources()->MergeFrom(resources.get());
-           remaining -= resources.get();
-           tasksToLaunch.push_back(task);
-
-           LOG(INFO) << "Resources remaining in offer " << offer.id()
-                     << " : " << remaining;
-
-           preparedTasksNumber++;
-          }
-
-          CHECK_EQ(preparedTasksNumber, tasksNumber);
-          Filters filter;
-          filter.set_refuse_seconds(0.0);
-          driver->launchTasks(offer.id(), tasksToLaunch, filter);
-
-          totalTasksLaunched += preparedTasksNumber;
-
-          it = offerList.erase(it);
-          foundFirstFitOffer = true;
-        }
-        else {
-          LOG(INFO) << "Offer with id" << offer.id()
-                    << " doesn't have: " << tasksGroupResources;
-          ++it;
-        }
-      }
-      if (!foundFirstFitOffer)
-        notStartedTasksGroups.push_back(tasksNumber);
-    }
-
-    // Some tasks didn't fit in any offer.
-    if (!notStartedTasksGroups.empty()) {
-      LOG(INFO) << "No offers available/remaining to launch some"
-                << " groups of tasks:";
-      foreach (const int& tasksNumber, notStartedTasksGroups) {
-        LOG(INFO) << "Not started a group of " << tasksNumber << " tasks.";
-      }
-    }
-    // Some offers have not been useful to any task. Decline them.
-    if (!offerList.empty()) {
-      foreach (const Offer& offer, offerList) {
-        LOG(WARNING) << "Offer with id "
-                     << offer.id()
-                     << " refused!!! (unable to launch any task)";
-        Filters filter;
-        filter.set_refuse_seconds(0.0);
-        driver->declineOffer(offer.id(), filter);
-      }
-    }
-    if (receivedOffers >= maxOffersReceivable)
-      driver->stop();
-  }
-  */
 
   virtual void resourceOffers(SchedulerDriver* driver,
                                 const vector<Offer>& offers)
@@ -739,7 +403,6 @@ int main(int argc, char** argv)
             return None();
           });
 
-
   flags.add(&cpusTaskDemand,
          "task_cpus_demand",
          None(),
@@ -775,7 +438,6 @@ int main(int argc, char** argv)
          "write stats. NB: if not specified no stats will be printed on file."
          );
 
-
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
   if (load.isError()) {
@@ -805,13 +467,6 @@ int main(int argc, char** argv)
   foreach (const flags::Warning& warning, load->warnings) {
     LOG(WARNING) << warning.message;
   }
-
-  cout << "TEST FRAMEWORK DRFH " << endl << "Configuration:" << endl
-       << "uniform distribution for tasks number per offer with a=" << A_PARAM
-       << " and b=" << B_PARAM <<endl
-       << "exponential distribution for CPU load with lambda=" << LAMBDA_PARAM
-       << endl << "gamma distribution for MEM load with alpha=" << MEAN_PARAM
-       << " and beta=" << STDDEV_PARAM << endl;
 
   ExecutorInfo executor;
   executor.mutable_executor_id()->set_value("default");
