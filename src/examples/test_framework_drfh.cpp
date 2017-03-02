@@ -91,34 +91,35 @@ static const double CPUS_PER_EXECUTOR = 0.1;
 static const int32_t MEM_PER_EXECUTOR = 32;
 
 std::default_random_engine taskNumberGenerator;
-std::exponential_distribution<double> taskNumberDistribution(0.5);
+std::default_random_engine tasksInterarrivalTimeGenerator;
+
+std::exponential_distribution<double> taskNumberExpDistribution05(0.5);
 
 // Get a tasks number from an exponential distribution with u=0.5.
 // Return values in [5, +inf).
-uint64_t generateExponentialTasksNumberUint64()
+uint64_t generateExponentialTasksNumber05_5()
 {
-  double value = taskNumberDistribution(taskNumberGenerator);
+  double value = taskNumberExpDistribution05(taskNumberGenerator);
   return static_cast<uint64_t>(value + 5);
 }
 
-std::default_random_engine tasksInterarrivalTimeGenerator;
 std::lognormal_distribution<double>
-  tasksInterarrivalTimeDistribution(4.064, 0.25);
+  tasksInterarrivalTimeLogNormDistribution60(4.064, 0.25);
 
 // Get the task duration from an lognormal distribution with m=4.064,s=0.25.
 // The mean value is about 60.
 // Return values in [0, +inf).
-uint64_t generateLognormalTasksInterarrivalTimeUint64()
+uint64_t generateLognormalTasksInterarrivalTime60()
 {
   uint64_t value =
-      static_cast<uint64_t>(tasksInterarrivalTimeDistribution(
+      static_cast<uint64_t>(tasksInterarrivalTimeLogNormDistribution60(
           tasksInterarrivalTimeGenerator));
 
   return value * 60;
 }
 
 uint64_t fillTasksList() {
-  uint64_t newTasks = generateExponentialTasksNumberUint64();
+  uint64_t newTasks = generateExponentialTasksNumber05_5();
   _lock.lock();
   queuedTasksNumber += newTasks;
   _lock.unlock();
@@ -389,7 +390,7 @@ void run()
   while (true) {
     LOG(INFO) << "New tasks queued="   << fillTasksList();
     LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
-    os::sleep(Seconds(generateLognormalTasksInterarrivalTimeUint64()));
+    os::sleep(Seconds(generateLognormalTasksInterarrivalTime60()));
   }
 }
 
