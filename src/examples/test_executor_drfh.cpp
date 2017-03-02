@@ -20,6 +20,8 @@
 #include <random>
 #include <thread>
 
+#include <boost/lexical_cast.hpp>
+
 #include <mesos/executor.hpp>
 
 #include <stout/duration.hpp>
@@ -27,42 +29,12 @@
 
 using namespace mesos;
 
+using boost::lexical_cast;
+
 using std::cout;
 using std::endl;
 using std::string;
 
-std::default_random_engine taskDurationGenerator;
-
-// Task duration distributions
-std::lognormal_distribution<double>
-  taskDurationLogNormDistribution60(4.064, 0.25);
-std::exponential_distribution<double> taskNumberExpDistribution05(0.5);
-
-// Task duration generators
-
-/*
-// Get the task duration from an lognormal distribution with m=4.064,s=0.25.
-// The mean value is about 60.
-// Return values in [0, +inf).
-uint64_t generateLognormalTasksDuration60()
-{
-  return static_cast<uint64_t>
-    (taskDurationLogNormDistribution60(taskDurationGenerator));
-}
-*/
-
-// Get the task duration from an exponential distribution with u=0.5.
-// Return values in [shift, +inf).
-uint64_t generateExpTasksDuration05(uint64_t shift)
-{
-  double value = taskNumberExpDistribution05(taskDurationGenerator);
-    return static_cast<uint64_t>(value + shift);
-}
-
-uint64_t getTaskDuration()
-{
-  return generateExpTasksDuration05(10);
-}
 
 void run(ExecutorDriver* driver, const TaskInfo& task)
 {
@@ -72,7 +44,7 @@ void run(ExecutorDriver* driver, const TaskInfo& task)
 
   driver->sendStatusUpdate(status);
 
-  uint64_t taskDuration = getTaskDuration();
+  uint64_t taskDuration = lexical_cast<uint64_t>(task.data());
   LOG(INFO) << "Task with ID: "
             <<  task.task_id().value()
             <<" is going to work for "
@@ -139,5 +111,7 @@ int main(int argc, char** argv)
 {
   TestExecutor executor;
   MesosExecutorDriver driver(&executor);
-  return driver.run() == DRIVER_STOPPED ? 0 : 1;
+  int returnValue = driver.run() == DRIVER_STOPPED ? 0 : 1;
+  LOG(INFO) << "Executor main ended. driver returne value=" << returnValue;
+  return returnValue;
 }

@@ -80,6 +80,21 @@ uint64_t offersDeclined = 0;
 uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
 
+enum class FrameworkType { COMMON, LOW};
+
+std::ostream& operator<<(std::ostream& os, FrameworkType f)
+{
+    switch(f)
+    {
+        case FrameworkType::COMMON   : os << "common";    break;
+        case FrameworkType::LOW      : os << "low";       break;
+        default                     : os.setstate(std::ios_base::failbit);
+    }
+    return os;
+}
+
+
+FrameworkType frameworkType;
 
 double cpusTaskDemand;
 Bytes memTaskDemand;
@@ -92,6 +107,8 @@ static const int32_t MEM_PER_EXECUTOR = 32;
 
 std::default_random_engine taskNumberGenerator;
 std::default_random_engine tasksInterarrivalTimeGenerator;
+std::default_random_engine taskDurationGenerator;
+
 
 // Tasks number distributions
 std::exponential_distribution<double> taskNumberExpDistribution05(0.5);
@@ -101,10 +118,17 @@ std::uniform_int_distribution<uint64_t>
 // Interarrival time distributions
 std::lognormal_distribution<double>
   tasksInterarrivalTimeLogNormDistribution60(4.064, 0.25);
+std::exponential_distribution<double>
+  tasksInterarrivalTimerExpDistribution05(0.5);
+
+// Task duration distributions
+std::lognormal_distribution<double>
+  taskDurationLogNormDistribution60(4.064, 0.25);
+std::exponential_distribution<double> taskDurationExpDistribution05(0.5);
+
 
 // Tasks number generators
 
-/*
 // Get a tasks number from an exponential distribution with u=0.5.
 // Return values in [shift, +inf).
 uint64_t generateExponentialTasksNumber05(uint64_t shift)
@@ -112,7 +136,6 @@ uint64_t generateExponentialTasksNumber05(uint64_t shift)
   double value = taskNumberExpDistribution05(taskNumberGenerator);
   return static_cast<uint64_t>(value + shift);
 }
-*/
 
 // Get a tasks number from a uniform distribution [1, 10].
 uint64_t generateUniformTasksNumber1_10()
@@ -122,7 +145,6 @@ uint64_t generateUniformTasksNumber1_10()
 
 // Interarrival time generators
 
-/*
 // Get the task interarrival time from an lognormal distribution
 // with m=4.064,s=0.25.
 // The mean value is about 60.
@@ -135,25 +157,67 @@ uint64_t generateLognormalTasksInterarrivalTime60()
 
   return value * 60;
 }
-*/
 
 // Get a tasks number from an exponential distribution with u=0.5.
 // Return values in [shift, +inf).
 uint64_t generateExponentialTasksInterarrivalTime05(uint64_t shift)
 {
-  double value = taskNumberExpDistribution05(taskNumberGenerator);
+  double value = tasksInterarrivalTimerExpDistribution05(taskNumberGenerator);
   return static_cast<uint64_t>(value + shift);
 }
 
+// Task duration generators
+
+// Get the task duration from an lognormal distribution with m=4.064,s=0.25.
+// The mean value is about 60.
+// Return values in [0, +inf).
+uint64_t generateLognormalTasksDuration60()
+{
+  return static_cast<uint64_t>
+    (taskDurationLogNormDistribution60(taskDurationGenerator));
+}
+
+// Get the task duration from an exponential distribution with u=0.5.
+// Return values in [shift, +inf).
+uint64_t generateExpTasksDuration05(uint64_t shift)
+{
+  double value = taskDurationExpDistribution05(taskDurationGenerator);
+    return static_cast<uint64_t>(value + shift);
+}
+
+// Generate functions
+
 uint64_t generateTasksNumber()
 {
-  return generateUniformTasksNumber1_10();
+  if (frameworkType == FrameworkType::COMMON)
+    return generateExponentialTasksNumber05(5);
+  else if (frameworkType == FrameworkType::LOW)
+    return generateUniformTasksNumber1_10();
+  else
+    exit(EXIT_FAILURE);
 }
 
 uint64_t generateTasksInterarrivalTime()
 {
-  return generateExponentialTasksInterarrivalTime05(3);
+  if (frameworkType == FrameworkType::COMMON)
+    return generateLognormalTasksInterarrivalTime60();
+  else if (frameworkType == FrameworkType::LOW)
+    return generateExponentialTasksInterarrivalTime05(3);
+  else
+    exit(EXIT_FAILURE);
 }
+
+uint64_t getTaskDuration()
+{
+  if (frameworkType == FrameworkType::COMMON)
+    return generateLognormalTasksDuration60();
+  else if (frameworkType == FrameworkType::LOW)
+    return generateExpTasksDuration05(10);
+  else
+    exit(EXIT_FAILURE);
+}
+
+///////
 
 uint64_t fillTasksList() {
   uint64_t newTasks = generateTasksNumber();
@@ -289,11 +353,14 @@ public:
           task.mutable_task_id()->set_value(lexical_cast<string>(taskId));
           task.mutable_slave_id()->MergeFrom(offer.slave_id());
           task.mutable_executor()->MergeFrom(executor);
+          uint64_t taskDuration = getTaskDuration();
+          task.set_data(lexical_cast<string>(taskDuration));
 
           LOG(INFO) << "Matching task ID " << taskId
-                   << " asking for cpu:" << cpusTaskDemand << ", mem:"
-                   << memTaskDemand.megabytes() << "MB"
-                   << " with offer " << offer.id();
+                    << " with duration " << taskDuration << "secs "
+                    << " asking for cpu:" << cpusTaskDemand << ", mem:"
+                    << memTaskDemand.megabytes() << "MB"
+                    << " with offer " << offer.id();
 
           Option<Resources> resources = remaining.find(TASK_RESOURCES);
           CHECK_SOME(resources);
@@ -506,6 +573,15 @@ int main(int argc, char** argv)
          "write stats. NB: if not specified no stats will be printed on file."
          );
 
+  Option<string> frameworkTypeString;
+  flags.add(&frameworkTypeString,
+           "framework_type",
+           "The framework type to launch. This imply the use of predefined "
+           "distributions to generate tasks/duration/interarrival time. "
+           "Each type has its own distributions.\n"
+           "Options are: common, low."
+           );
+
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
   if (load.isError()) {
@@ -516,7 +592,24 @@ int main(int argc, char** argv)
     cerr << "Missing --master" << endl;
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
+  } else if (frameworkTypeString.isNone()) {
+    cerr << "Missing --framework_type" << endl;
+    usage(argv[0], flags);
+    exit(EXIT_FAILURE);
   }
+
+  if (frameworkTypeString.get().compare("common") == 0)
+    frameworkType = FrameworkType::COMMON;
+  else if (frameworkTypeString.get().compare("low") == 0)
+    frameworkType = FrameworkType::LOW;
+  else {
+    cerr << "value for --framework_type unrecognized" << endl;
+    usage(argv[0], flags);
+    exit(EXIT_FAILURE);
+  }
+
+  LOG(INFO) << "Framework type selected: " << frameworkType;
+
 
   if (statsFilepath.isSome()) {
     if (remove(statsFilepath.get().c_str()) == 0 )
