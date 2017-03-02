@@ -32,10 +32,15 @@ using std::endl;
 using std::string;
 
 std::default_random_engine taskDurationGenerator;
-std::uniform_int_distribution<int> taskDurationDistribution(10, 120);
-// TODO(danang) make this function thread-safe
-auto generateTasksDuration =
-    std::bind (taskDurationDistribution, taskDurationGenerator);
+std::lognormal_distribution<double> taskDurationDistribution(4.064, 0.25);
+
+// Get the task duration from an lognormal distribution with m=4.064,s=0.25.
+// The mean value is about 60.
+// Return values in [0, +inf).
+uint64_t generateLognormalTasksDurationUint64()
+{
+  return static_cast<uint64_t>(taskDurationDistribution(taskDurationGenerator));
+}
 
 void run(ExecutorDriver* driver, const TaskInfo& task)
 {
@@ -45,7 +50,7 @@ void run(ExecutorDriver* driver, const TaskInfo& task)
 
   driver->sendStatusUpdate(status);
 
-  int taskDuration = generateTasksDuration();
+  uint64_t taskDuration = generateLognormalTasksDurationUint64();
   LOG(INFO) << "Task with ID: "
             <<  task.task_id().value()
             <<" is going to work for "
