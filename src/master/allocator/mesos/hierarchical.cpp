@@ -278,6 +278,8 @@ Option<tuple<SlaveID, Resources>>
 {
   LOG(INFO) << "STARTING maxResourceHeuristic";
 
+  // Compare to be used in std::sort.
+  // Return true if first should go before than second. False otherwise.
   auto compareCpuResource = [](
       const tuple<SlaveID, Resources>& first,
       const tuple<SlaveID, Resources>& second) {
@@ -285,7 +287,7 @@ Option<tuple<SlaveID, Resources>>
     Option<double> cpusSecond = std::get<1>(second).cpus();
 
     if (cpusFirst.isSome() && cpusSecond.isSome()) {
-      if (cpusFirst.get() >= cpusSecond.get())
+      if (cpusFirst.get() <= cpusSecond.get())
         return true;
       return false;
     }
@@ -293,8 +295,9 @@ Option<tuple<SlaveID, Resources>>
       return false;
     else if (cpusFirst.isSome() && cpusSecond.isNone())
       return true;
-    else return true; // both are None, it doesn't matter which one got first.
+    else return true; // both are None, it doesn't matter which one go first.
   };
+
   // If never allocated
   vector<tuple<SlaveID, Resources>> cpuSortedSlaves(
       slaves.begin(),
