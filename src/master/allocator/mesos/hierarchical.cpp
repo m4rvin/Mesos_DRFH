@@ -123,6 +123,43 @@ private:
   const Timeout timeout;
 };
 
+class ResourcesHelper
+{
+public:
+  static double getSlaveAvailableCpus(
+        HierarchicalAllocatorProcess* process,
+        SlaveID slaveId)
+    {
+      // retrieve total cpu capacity from the slave
+      Option<double> totalCpus = process->slaves[slaveId].total.cpus();
+      CHECK_SOME(totalCpus);
+
+      // update available and allocated cpu amount for that slave
+      double availableCpu = totalCpus.get();
+      Option<double> allocatedCpu = process->slaves[slaveId].allocated.cpus();
+      if (allocatedCpu.isSome())
+        availableCpu = totalCpus.get() - allocatedCpu.get();
+
+      return availableCpu;
+    }
+
+  static Bytes getSlaveAvailableMem(
+          HierarchicalAllocatorProcess* process,
+          SlaveID slaveId)
+    {
+      // retrieve total mem capacity from a slave
+      Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
+      CHECK_SOME(totalMem);
+
+      // update available and allocated mem(MB) amount for that slave
+      Bytes availableMem = totalMem.get();
+      Option<Bytes> allocatedMem = process->slaves[slaveId].allocated.mem();
+      if (allocatedMem.isSome()) {
+        availableMem = totalMem.get() - allocatedMem.get();
+      }
+      return availableMem;
+    }
+};
 
 class ComplexResourcesRepresentation
 {
@@ -166,35 +203,26 @@ private:
   SlaveID resourcesSlaveID;
 
   ComplexResourcesRepresentation(
-        HierarchicalAllocatorProcess* process,
-        SlaveID slaveId,
-        tuple<double, uint64_t> maxResources)
+      HierarchicalAllocatorProcess* process,
+      SlaveID slaveId,
+      tuple<double, uint64_t> maxResources)
   {
     // retrieve total cpu capacity from a slave
     Option<double> totalCpu = process->slaves[slaveId].total.cpus();
     CHECK_SOME(totalCpu);
 
+    double availableCpu =
+        ResourcesHelper::getSlaveAvailableCpus(process, slaveId);
+    double availablePercentageCpu = availableCpu / totalCpu.get();
+
     // retrieve total mem capacity from a slave
     Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
     CHECK_SOME(totalMem);
 
-    // update available and allocated cpu amount for that slave
-    double availableCpu = totalCpu.get();
-    Option<double> allocatedCpu = process->slaves[slaveId].allocated.cpus();
-    if (allocatedCpu.isSome())
-      availableCpu = totalCpu.get() - allocatedCpu.get();
-
     // update available and allocated mem(MB) amount for that slave
     uint64_t totalMemMB = totalMem.get().megabytes();
-    uint64_t allocatedMemMB = 0;
-    uint64_t availableMemMB = totalMemMB;
-    Option<Bytes> allocatedMem = process->slaves[slaveId].allocated.mem();
-    if (allocatedMem.isSome()) {
-      allocatedMemMB = allocatedMem.get().megabytes();
-      availableMemMB = totalMemMB - allocatedMemMB;
-    }
-
-    double availablePercentageCpu = availableCpu / totalCpu.get();
+    uint64_t availableMemMB =
+        ResourcesHelper::getSlaveAvailableMem(process, slaveId).megabytes();
     // FIXME possible issue if not casting also the dividend?
     double availablePercentageMem =
       availableMemMB / static_cast<double>(totalMemMB);
@@ -214,14 +242,9 @@ private:
 
     // LOG messages. TODO remove
     VLOG(blind_policy_log_level) << "total cpu=" << totalCpu.get();
-    if (allocatedCpu.isSome())
-      VLOG(blind_policy_log_level) << "allocated cpu=" << allocatedCpu.get();
-    else
-      VLOG(blind_policy_log_level) << "allocated cpu=" << 0;
     VLOG(blind_policy_log_level) << "available cpu=" << availableCpu;
 
     VLOG(blind_policy_log_level) << "total mem=" << totalMemMB;
-    VLOG(blind_policy_log_level) << "allocated mem=" << allocatedMemMB;
     VLOG(blind_policy_log_level) << "available mem=" << availableMemMB;
 
     VLOG(blind_policy_log_level) << "created complexResourcesRepresentation: "

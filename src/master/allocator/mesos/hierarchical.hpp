@@ -67,6 +67,7 @@ namespace internal {
 // Forward declarations.
 class OfferFilter;
 class InverseOfferFilter;
+class ResourcesHelper;
 class ComplexResourcesRepresentation;
 
 
@@ -75,6 +76,7 @@ class ComplexResourcesRepresentation;
 class HierarchicalAllocatorProcess : public MesosAllocatorProcess
 {
 friend class ComplexResourcesRepresentation;
+friend class ResourcesHelper;
 
 public:
   HierarchicalAllocatorProcess(
