@@ -424,8 +424,9 @@ Option<tuple<SlaveID, Resources>>
   return slaveChosen;
 }
 
-Option<vector<SlaveID>> HierarchicalAllocatorProcess::blindSort(
-    const vector<SlaveID>& slaveIds)
+Option<vector<SlaveID>>
+  HierarchicalAllocatorProcess::balancedResourcesHeuristic(
+      const vector<SlaveID>& slaveIds)
 {
   VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
   if (slaveIds.size() > 0)

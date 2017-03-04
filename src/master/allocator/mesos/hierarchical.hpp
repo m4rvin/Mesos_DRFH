@@ -213,7 +213,8 @@ protected:
   typedef HierarchicalAllocatorProcess This;
 
   // Blind sorting of slaves
-  Option<std::vector<SlaveID>> blindSort(const std::vector<SlaveID>& slaveIds);
+  Option<std::vector<SlaveID>>
+    balancedResourcesHeuristic(const std::vector<SlaveID>& slaveIds);
 
   std::tuple<double, uint64_t> findMaxResourcesCapacity(
       const std::vector<SlaveID>& slaveIds);
