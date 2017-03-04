@@ -341,6 +341,51 @@ Option<tuple<SlaveID, Resources>>
     else return true; // both are None, it doesn't matter which one go first.
   };
 
+  // Get the first slave ID appearing in both the ascending ordered slaves
+  // starting from the top sorted value in each vector.
+  // Start putting the top id from the cpu vector into a hashset of ids. If
+  // the id is already in then return the id, otherwise put the top d from the
+  // mem vector. If the id is already in then return the id, otherwise
+  // go to the next position in both vectors and reapeat.
+  // NB: since the two vectors are built from the same source, they should
+  // contain the same values so, sooner or later, one id will be returned.
+  //  e.g.:
+  //  cpuSortedSlaves: 5|6|1|3|2|4 (slave ID 4 has the best cpus)
+  //  memSortedSlaves: 1|3|4|2|6|5 (slave ID 5 has the best mem)
+  //  returned slave ID: 2
+  auto selectMaxResources = [slaves] (
+      vector<tuple<SlaveID, Resources>> cpuSortedSlaves,
+      vector<tuple<SlaveID, Resources>> memSortedSlaves) {
+    CHECK_NE(static_cast<int>(cpuSortedSlaves.size()), 0);
+    CHECK_NE(static_cast<int>(memSortedSlaves.size()), 0);
+    CHECK_EQ(static_cast<int>(cpuSortedSlaves.size()),
+             static_cast<int>(slaves.size()));
+    CHECK_EQ(static_cast<int>(memSortedSlaves.size()),
+             static_cast<int>(slaves.size()));
+
+    hashset<SlaveID> scannedSlaveIds;
+    // just in case the vector are simmetrical and we want avoid reallocation.
+    scannedSlaveIds.reserve(slaves.size());
+
+    for (int i = slaves.size()-1; i >= 0; i--) {
+      SlaveID slaveId = std::get<0>(cpuSortedSlaves[i]);
+      if (scannedSlaveIds.contains(slaveId))
+        return cpuSortedSlaves[i];
+      else
+        scannedSlaveIds.insert(slaveId);
+
+      slaveId = std::get<0>(memSortedSlaves[i]);
+      if (scannedSlaveIds.contains(slaveId))
+        return memSortedSlaves[i];
+      else
+        scannedSlaveIds.insert(slaveId);
+    }
+    // If the above does not return then the vectors contain different element
+    // but this is not possible, so exit with failure and check the sourcecode.
+    // TODO(danang) is it necessary?
+    exit(EXIT_FAILURE);
+  };
+
   // Slaves to be sorted in ascending order by CPU
   vector<tuple<SlaveID, Resources>> cpuSortedSlaves(
       slaves.begin(),
@@ -351,7 +396,7 @@ Option<tuple<SlaveID, Resources>>
   std::sort(startIt, endIt, compareCpuResource);
   for(int i = 0; i < static_cast<int>(cpuSortedSlaves.size()); i++)
   {
-    LOG(INFO) << "sorted slaves in pos [" << i << "]="
+    LOG(INFO) << "sorted slaves by cpu in pos [" << i << "]="
               << std::get<0>(cpuSortedSlaves[i]);
   }
 
@@ -365,15 +410,16 @@ Option<tuple<SlaveID, Resources>>
   std::sort(startIt, endIt, compareMemResource);
   for(int i = 0; i < static_cast<int>(memSortedSlaves.size()); i++)
   {
-    LOG(INFO) << "sorted slaves in pos [" << i << "]="
+    LOG(INFO) << "sorted slaves by mem in pos [" << i << "]="
               << std::get<0>(memSortedSlaves[i]);
   }
 
   // Select the server with
-  tuple<SlaveID, Resources> slaveChosen =  cpuSortedSlaves.front();
+  tuple<SlaveID, Resources> slaveChosen =
+      selectMaxResources(cpuSortedSlaves, memSortedSlaves);
   CHECK(slaves.erase(std::get<0>(slaveChosen)) == 1);
 
-  LOG(INFO) << "maxResourceHeuristic choose slave: "
+  LOG(INFO) << "maxResourceHeuristic chose slave: "
             << std::get<0>(slaveChosen);
   return slaveChosen;
 }
