@@ -301,7 +301,7 @@ Option<tuple<SlaveID, Resources>>
 {
   LOG(INFO) << "STARTING maxResourceHeuristic";
 
-  // Compare to be used in std::sort.
+  // Compare to be used in std::sort based on cpus.
   // Return true if first should go before than second. False otherwise.
   auto compareCpuResource = [](
       const tuple<SlaveID, Resources>& first,
@@ -315,34 +315,61 @@ Option<tuple<SlaveID, Resources>>
       return false;
     }
     else if (cpusFirst.isNone() && cpusSecond.isSome())
-      return false;
-    else if (cpusFirst.isSome() && cpusSecond.isNone())
       return true;
+    else if (cpusFirst.isSome() && cpusSecond.isNone())
+      return false;
     else return true; // both are None, it doesn't matter which one go first.
   };
 
-  // If never allocated
+  // Compare to be used in std::sort based on mem.
+  // Return true if first should go before than second. False otherwise.
+  auto compareMemResource = [](
+      const tuple<SlaveID, Resources>& first,
+      const tuple<SlaveID, Resources>& second) {
+    Option<Bytes> memFirst = std::get<1>(first).mem();
+    Option<Bytes> memSecond = std::get<1>(second).mem();
+
+    if (memFirst.isSome() && memSecond.isSome()) {
+      if (memFirst.get() <= memSecond.get())
+        return true;
+      return false;
+    }
+    else if (memFirst.isNone() && memSecond.isSome())
+      return true;
+    else if (memFirst.isSome() && memSecond.isNone())
+      return false;
+    else return true; // both are None, it doesn't matter which one go first.
+  };
+
+  // Slaves to be sorted in ascending order by CPU
   vector<tuple<SlaveID, Resources>> cpuSortedSlaves(
       slaves.begin(),
       slaves.end());
 
-  // cpuSortedSlaves.reserve(slaves.size());
-  /*vector<tuple<SlaveID, Resources>> memSortedSlaves(
-      slaves.begin(),
-      slaves.end());*/
-  // memSortedSlaves.reserve(slaves.size());
-
   auto startIt = cpuSortedSlaves.begin();
   auto endIt = cpuSortedSlaves.end();
-
   std::sort(startIt, endIt, compareCpuResource);
-
   for(int i = 0; i < static_cast<int>(cpuSortedSlaves.size()); i++)
   {
     LOG(INFO) << "sorted slaves in pos [" << i << "]="
               << std::get<0>(cpuSortedSlaves[i]);
   }
 
+  // Slaves to be sorted in ascending order by MEM
+  vector<tuple<SlaveID, Resources>> memSortedSlaves(
+        slaves.begin(),
+        slaves.end());
+
+  startIt = memSortedSlaves.begin();
+  endIt = memSortedSlaves.end();
+  std::sort(startIt, endIt, compareMemResource);
+  for(int i = 0; i < static_cast<int>(memSortedSlaves.size()); i++)
+  {
+    LOG(INFO) << "sorted slaves in pos [" << i << "]="
+              << std::get<0>(memSortedSlaves[i]);
+  }
+
+  // Select the server with
   tuple<SlaveID, Resources> slaveChosen =  cpuSortedSlaves.front();
   CHECK(slaves.erase(std::get<0>(slaveChosen)) == 1);
 
