@@ -70,12 +70,14 @@ int receivedOffers = 0;
 int totalOffersReceived = 0;
 
 uint64_t totalTasksLaunched = 0;
+uint64_t totalTasksNotLaunched = 0;
 uint64_t totalOffersDeclined = 0;
 uint64_t totalOffersAccepted = 0;
 uint64_t totalOffersUnused = 0;
 
 uint64_t allocationRunNumber = 0;
 uint64_t tasksLaunched = 0;
+uint64_t tasksNotLaunched = 0;
 uint64_t offersDeclined = 0;
 uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
@@ -251,6 +253,8 @@ void printTotalStats()
 {
   LOG(INFO) << endl
             << "Total tasks launched = "   << totalTasksLaunched   << endl
+            << "Total tasks not launched = "
+            << totalTasksNotLaunched   << endl
             << "Total offers received = "  << totalOffersReceived  << endl
             << "Total offers declined = "  << totalOffersDeclined  << endl
             << "Total offers accepted = "  << totalOffersAccepted  << endl
@@ -260,6 +264,7 @@ void printTotalStats()
 void resetStats() {
   receivedOffers  = 0;
   tasksLaunched   = 0;
+  tasksNotLaunched   = 0;
   offersDeclined  = 0;
   offersAccepted  = 0;
   offersUnused    = 0;
@@ -268,12 +273,13 @@ void resetStats() {
 void printStats()
 {
   LOG(INFO) << endl
-            << "Allocation run#"     << allocationRunNumber << endl
-            << "Tasks launched = "   << tasksLaunched   << endl
-            << "Offers received= "   << receivedOffers  << endl
-            << "Offers declined = "  << offersDeclined  << endl
-            << "Offers accepted = "  << offersAccepted  << endl
-            << "Offers unused = "    << offersUnused;
+            << "Allocation run#"         << allocationRunNumber << endl
+            << "Tasks launched = "       << tasksLaunched       << endl
+            << "Tasks not launched = "   << tasksNotLaunched    << endl
+            << "Offers received= "       << receivedOffers      << endl
+            << "Offers declined = "      << offersDeclined      << endl
+            << "Offers accepted = "      << offersAccepted      << endl
+            << "Offers unused = "        << offersUnused;
 }
 
 void printOnFile() {
@@ -285,10 +291,12 @@ void printOnFile() {
   if (!myfile.is_open())
     LOG(ERROR) << "Error opening the file to ouptut stats.";
   else {
-    myfile << receivedOffers << " "
-           << offersDeclined << " "
-           << offersAccepted << " "
-           << offersUnused << endl;
+    myfile << receivedOffers    << " "
+           << offersDeclined    << " "
+           << offersAccepted    << " "
+           << offersUnused      << " "
+           << tasksLaunched     << " "
+           << tasksNotLaunched  << endl;
     myfile.close();
   }
 }
@@ -323,6 +331,7 @@ public:
   virtual void resourceOffers(SchedulerDriver* driver,
                                 const vector<Offer>& offers)
   {
+    uint64_t lastReadQueuedTaskNumber;
     allocationRunNumber++;
     foreach (const Offer& offer, offers) {
       receivedOffers++;
@@ -343,7 +352,8 @@ public:
       tasksToLaunch.reserve(10);
       bool insufficientResources = false;
 
-      while (getQueuedTasks() > 0 && allocatable(remaining)) {
+      while ((lastReadQueuedTaskNumber = getQueuedTasks()) > 0
+          && allocatable(remaining)) {
         dequeueTaskFromList();
         if (remaining.contains(TASK_RESOURCES)) {
           tasksLaunched++;
@@ -375,7 +385,7 @@ public:
         else {
           requeueTaskIntoList();
           insufficientResources = true;
-          break;
+          break; // this offer is not useful anymore
         }
       }
       if (!tasksToLaunch.empty()) {
@@ -402,6 +412,8 @@ public:
         driver->declineOffer(offer.id(), filter);
       }
     }
+    tasksNotLaunched = lastReadQueuedTaskNumber;
+    totalTasksNotLaunched += tasksNotLaunched;
     printStats();
     printOnFile();
     resetStats();
