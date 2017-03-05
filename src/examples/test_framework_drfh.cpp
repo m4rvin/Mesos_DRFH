@@ -113,7 +113,7 @@ std::default_random_engine taskDurationGenerator;
 // Tasks number distributions
 std::exponential_distribution<double> taskNumberExpDistribution05(0.5);
 std::uniform_int_distribution<uint64_t>
-  taskNumberUniformDistribution1_10(1, 10);
+  taskNumberUniformDistribution1_10(1, 100);
 
 // Interarrival time distributions
 std::lognormal_distribution<double>
