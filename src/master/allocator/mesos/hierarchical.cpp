@@ -18,6 +18,8 @@
 
 #include <algorithm>
 #include <complex>
+#include <iostream>
+#include <list>
 #include <set>
 #include <string>
 
@@ -37,11 +39,13 @@
 
 #include "common/protobuf_utils.hpp"
 
+using std::complex;
+using std::endl;
 using std::set;
 using std::string;
-using std::vector;
-using std::complex;
 using std::tuple;
+using std::vector;
+
 using mesos::allocator::InverseOfferStatus;
 
 using process::Failure;
@@ -143,22 +147,81 @@ public:
       return availableCpu;
     }
 
+  /*
+  static double getTotalAllocatedCpus(
+        HierarchicalAllocatorProcess* process)
+    {
+      std::list<HierarchicalAllocatorProcess::Slave> slaves =
+          process->slaves.values();
+      double totalAllocatedCpus = 0;
+      for ( auto it = slaves.begin(); it != slaves.end(); ++it ) {
+        if (it->allocated.cpus().isSome())
+            totalAllocatedCpus += it->allocated.cpus().get();
+      }
+      return totalAllocatedCpus;
+    }
+
+  static double getTotalCpus(
+        HierarchicalAllocatorProcess* process)
+  {
+    std::list<HierarchicalAllocatorProcess::Slave> slaves =
+             process->slaves.values();
+    double totalCpus = 0;
+    for ( auto it = slaves.begin(); it != slaves.end(); ++it ) {
+      CHECK (it->total.cpus());
+      totalCpus += it->total.cpus().get();
+    }
+    return totalCpus;
+  }
+  */
+
+  static double getClusterCpuUtilization(
+      std::list<HierarchicalAllocatorProcess::Slave> slaves)
+  {
+    double totalAllocatedCpus = 0;
+    double totalCpus = 0;
+
+    for ( auto it = slaves.begin(); it != slaves.end(); ++it ) {
+      if (it->allocated.cpus().isSome())
+          totalAllocatedCpus += it->allocated.cpus().get();
+      CHECK_SOME(it->total.cpus());
+      totalCpus += it->total.cpus().get();
+    }
+    return (totalAllocatedCpus/totalCpus) * 100;
+  }
+
   static Bytes getSlaveAvailableMem(
           HierarchicalAllocatorProcess* process,
           SlaveID slaveId)
-    {
-      // retrieve total mem capacity from a slave
-      Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
-      CHECK_SOME(totalMem);
+  {
+    // retrieve total mem capacity from a slave
+    Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
+    CHECK_SOME(totalMem);
 
-      // update available and allocated mem(MB) amount for that slave
-      Bytes availableMem = totalMem.get();
-      Option<Bytes> allocatedMem = process->slaves[slaveId].allocated.mem();
-      if (allocatedMem.isSome()) {
-        availableMem = totalMem.get() - allocatedMem.get();
-      }
-      return availableMem;
+    // update available and allocated mem(MB) amount for that slave
+    Bytes availableMem = totalMem.get();
+    Option<Bytes> allocatedMem = process->slaves[slaveId].allocated.mem();
+    if (allocatedMem.isSome()) {
+      availableMem = totalMem.get() - allocatedMem.get();
     }
+    return availableMem;
+  }
+
+  static double getClusterMemUtilization(
+      std::list<HierarchicalAllocatorProcess::Slave> slaves)
+  {
+    Bytes totalAllocatedMem = 0;
+    Bytes totalMem = 0;
+
+    for ( auto it = slaves.begin(); it != slaves.end(); ++it ) {
+      if (it->allocated.cpus().isSome())
+        totalAllocatedMem += it->allocated.mem().get();
+      CHECK_SOME(it->total.mem());
+      totalMem += it->total.mem().get();
+    }
+    return (static_cast<double>(totalAllocatedMem.megabytes())/
+        static_cast<double>(totalMem.megabytes())) * 100;
+  }
 };
 
 class ComplexResourcesRepresentation
