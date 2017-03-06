@@ -557,6 +557,16 @@ Option<vector<SlaveID>>
   }
 }
 
+void HierarchicalAllocatorProcess::logClusterUtilizazion(
+    std::list<HierarchicalAllocatorProcess::Slave> slavesList)
+{
+  LOG(INFO) << endl << "Cluster utilization: " << endl
+            << "CPU: "
+            << ResourcesHelper::getClusterCpuUtilization(slavesList) << "%"
+            << endl << "MEM: "
+            << ResourcesHelper::getClusterMemUtilization(slavesList) << "%";
+}
+
 void HierarchicalAllocatorProcess::initialize(
     const Duration& _allocationInterval,
     const lambda::function<
@@ -1457,6 +1467,9 @@ void HierarchicalAllocatorProcess::recoverResources(
             << ", allocated: " << slaves[slaveId].allocated
             << ") on agent " << slaveId
             << " from framework " << frameworkId;
+
+    std::list<HierarchicalAllocatorProcess::Slave> slavesList = slaves.values();
+    logClusterUtilizazion(slavesList);
   }
 
   // No need to install the filter if 'filters' is none.

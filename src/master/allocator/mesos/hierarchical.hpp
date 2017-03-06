@@ -500,6 +500,9 @@ protected:
 
   // Factory function for framework sorters.
   const std::function<Sorter*()> frameworkSorterFactory;
+
+
+  void logClusterUtilizazion(std::list<Slave> slavesList);
 };
 
 
