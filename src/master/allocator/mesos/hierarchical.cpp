@@ -1467,9 +1467,6 @@ void HierarchicalAllocatorProcess::recoverResources(
             << ", allocated: " << slaves[slaveId].allocated
             << ") on agent " << slaveId
             << " from framework " << frameworkId;
-
-    std::list<HierarchicalAllocatorProcess::Slave> slavesList = slaves.values();
-    logClusterUtilizazion(slavesList);
   }
 
   // No need to install the filter if 'filters' is none.
@@ -1686,6 +1683,12 @@ void HierarchicalAllocatorProcess::updateWeights(
   if (rebalance) {
     allocate();
   }
+}
+
+void HierarchicalAllocatorProcess::updateClusterUtilization()
+{
+  std::list<HierarchicalAllocatorProcess::Slave> slavesList = slaves.values();
+  logClusterUtilizazion(slavesList);
 }
 
 

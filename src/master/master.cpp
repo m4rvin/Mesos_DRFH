@@ -4425,6 +4425,11 @@ void Master::_accept(
         _offeredResources,
         accept.filters());
   }
+
+  // If some resources have been allocated to and will be used by frameworks'
+  // tasks, then the utilization will change, otherwise it will be the same.
+  // In both cases we want to update it.
+  allocator->updateClusterUtilization();
 }
 
 

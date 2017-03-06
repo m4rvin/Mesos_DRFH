@@ -207,6 +207,9 @@ public:
   void updateWeights(
       const std::vector<WeightInfo>& weightInfos);
 
+  void updateClusterUtilization();
+
+
 protected:
   // Useful typedefs for dispatch/delay/defer to self()/this.
   typedef HierarchicalAllocatorProcess Self;

@@ -156,6 +156,8 @@ public:
   void updateWeights(
       const std::vector<WeightInfo>& weightInfos);
 
+  void updateClusterUtilization();
+
 private:
   MesosAllocator();
   MesosAllocator(const MesosAllocator&); // Not copyable.
@@ -286,6 +288,8 @@ public:
 
   virtual void updateWeights(
       const std::vector<WeightInfo>& weightInfos) = 0;
+
+  virtual void updateClusterUtilization() = 0;
 };
 
 
@@ -648,6 +652,14 @@ inline void MesosAllocator<AllocatorProcess>::updateWeights(
       process,
       &MesosAllocatorProcess::updateWeights,
       weightInfos);
+}
+
+template <typename AllocatorProcess>
+inline void MesosAllocator<AllocatorProcess>::updateClusterUtilization()
+{
+  process::dispatch(
+      process,
+      &MesosAllocatorProcess::updateClusterUtilization);
 }
 
 } // namespace allocator {

@@ -393,6 +393,13 @@ public:
    */
   virtual void updateWeights(
       const std::vector<WeightInfo>& weightInfos) = 0;
+
+
+  /**
+   * Update utilization of the cluster resources analyzing all allocated
+   * and total resources for every slave.
+   */
+  virtual void updateClusterUtilization() = 0;
 };
 
 } // namespace allocator {
