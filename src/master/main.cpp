@@ -200,6 +200,14 @@ int main(int argc, char** argv)
             "the IP address which the master will try to bind to.\n"
             "Cannot be used in conjunction with `--ip`.");
 
+  Option<string> clusterStatsFilepath;
+  flags.add(&clusterStatsFilepath,
+         "cluster_stats_file",
+         "The absolute filepath (i.e. /path/filename) to the file where to "
+         "write cluster stats. "
+         "NB: if not specified no stats will be printed on file."
+         );
+
   Try<flags::Warnings> load = flags.load("MESOS_", argc, argv);
 
   if (flags.help) {
@@ -257,6 +265,10 @@ int main(int argc, char** argv)
                        "--master_contender/--master_detector "
                        "pair should be specified.");
     }
+  }
+
+  if(clusterStatsFilepath.isSome()) {
+    os::setenv("CLUSTER_STATS_FILE", clusterStatsFilepath.get());
   }
 
   // Log build information.

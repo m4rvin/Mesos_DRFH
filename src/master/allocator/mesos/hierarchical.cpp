@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <complex>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <set>
@@ -34,6 +35,7 @@
 
 #include <stout/check.hpp>
 #include <stout/hashset.hpp>
+#include <stout/os.hpp>
 #include <stout/stopwatch.hpp>
 #include <stout/stringify.hpp>
 
@@ -560,11 +562,27 @@ Option<vector<SlaveID>>
 void HierarchicalAllocatorProcess::logClusterUtilizazion(
     std::list<HierarchicalAllocatorProcess::Slave> slavesList)
 {
+  double cpuUtilization = ResourcesHelper::getClusterCpuUtilization(slavesList);
+  double memUtilization = ResourcesHelper::getClusterMemUtilization(slavesList);
+
   LOG(INFO) << endl << "Cluster utilization: " << endl
             << "CPU: "
-            << ResourcesHelper::getClusterCpuUtilization(slavesList) << "%"
+            << cpuUtilization << "%"
             << endl << "MEM: "
-            << ResourcesHelper::getClusterMemUtilization(slavesList) << "%";
+            << memUtilization << "%";
+
+  Option<string> clusterStatsFile = os::getenv("CLUSTER_STATS_FILE");
+  if (clusterStatsFile.isSome()) {
+    std::ofstream myfile;
+    myfile.open (clusterStatsFile.get(), std::ofstream::app);
+    if (!myfile.is_open())
+      LOG(ERROR) << "Error opening the file to ouptut stats.";
+    else {
+      myfile << cpuUtilization    << " "
+             << memUtilization    << endl;
+      myfile.close();
+    }
+  }
 }
 
 void HierarchicalAllocatorProcess::initialize(
