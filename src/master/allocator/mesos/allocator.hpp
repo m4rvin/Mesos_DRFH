@@ -289,7 +289,7 @@ public:
   virtual void updateWeights(
       const std::vector<WeightInfo>& weightInfos) = 0;
 
-  virtual void updateClusterUtilization() = 0;
+  virtual void updateClusterUtilization() {};
 };
 
 

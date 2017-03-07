@@ -399,7 +399,7 @@ public:
    * Update utilization of the cluster resources analyzing all allocated
    * and total resources for every slave.
    */
-  virtual void updateClusterUtilization() = 0;
+  virtual void updateClusterUtilization() {};
 };
 
 } // namespace allocator {
