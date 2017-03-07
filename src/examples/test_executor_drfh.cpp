@@ -51,7 +51,8 @@ void run(ExecutorDriver* driver, const TaskInfo& task)
             << taskDuration << " seconds";
 
   // This is where one would perform the requested task.
-  os::sleep(Seconds(taskDuration));
+  if (os::sleep(Seconds(taskDuration)).isError())
+    LOG(ERROR) << "Task terminated because an error interrupted sleep() work..";
 
   LOG(INFO) << "Task with ID: "
             << task.task_id().value()
