@@ -221,7 +221,7 @@ uint64_t getTaskDuration()
 
 ///////
 
-uint64_t fillTasksList() {
+uint64_t enqueueTask() {
   uint64_t newTasks = generateTasksNumber();
   _lock.lock();
   queuedTasksNumber += newTasks;
@@ -229,13 +229,13 @@ uint64_t fillTasksList() {
   return newTasks;
 }
 
-void dequeueTaskFromList() {
+void dequeueTask() {
   _lock.lock();
   queuedTasksNumber -= 1;
   _lock.unlock();
 }
 
-void requeueTaskIntoList() {
+void reinsertTask() {
   _lock.lock();
   queuedTasksNumber += 1;
   _lock.unlock();
@@ -354,7 +354,7 @@ public:
 
       while ((lastReadQueuedTaskNumber = getQueuedTasks()) > 0
           && allocatable(remaining)) {
-        dequeueTaskFromList();
+        dequeueTask();
         if (remaining.contains(TASK_RESOURCES)) {
           tasksLaunched++;
           uint64_t taskId = totalTasksLaunched++;
@@ -383,7 +383,7 @@ public:
                    << " : " << remaining;
         }
         else {
-          requeueTaskIntoList();
+          reinsertTask();
           insufficientResources = true;
           break; // this offer is not useful anymore
         }
@@ -504,7 +504,7 @@ void usage(const char* argv0, const flags::FlagsBase& flags)
 void run()
 {
   while (true) {
-    LOG(INFO) << "New tasks queued="   << fillTasksList();
+    LOG(INFO) << "New tasks queued="   << enqueueTask();
     LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
     os::sleep(Seconds(generateTasksInterarrivalTime()));
   }
