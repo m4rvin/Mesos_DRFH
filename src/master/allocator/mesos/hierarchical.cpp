@@ -350,6 +350,24 @@ HierarchicalAllocatorProcess::findMaxResourcesCapacity(
 }
 
 Option<tuple<SlaveID, Resources>>
+  HierarchicalAllocatorProcess::randomServerHeuristic
+  (hashmap<SlaveID, Resources>& slaves)
+{
+  vector<tuple<SlaveID, Resources>> slavesVect (slaves.begin(), slaves.end());
+  std::random_shuffle(slavesVect.begin(), slavesVect.end());
+
+  // Take and remove the first server.
+  auto it = slavesVect.begin();
+  if (it == slavesVect.end())
+    return None();
+
+  Option<tuple<SlaveID, Resources>> selectedSlave = Some(*it);
+  slaves.erase(std::get<0>(*it));
+  return selectedSlave;
+}
+
+
+Option<tuple<SlaveID, Resources>>
   HierarchicalAllocatorProcess::maxResourcesHeuristic
   (hashmap<SlaveID, Resources>& slaves)
 {
@@ -1703,9 +1721,16 @@ void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
   if (cpusAllocated.isNone()) {
     slaves[slaveId].cpuUtilization = 0;
   }
-  else
+  else {
+    LOG(INFO) << "cpu allocated for slave " << slaveId
+              << " = " << cpusAllocated.get();
+
     slaves[slaveId].cpuUtilization =
         (cpusAllocated.get() / slave.total.cpus().get()) * 100;
+
+    LOG(INFO) << "cpu total for slave " << slaveId
+              << " = " << slave.total.cpus().get();
+  }
 
   Option<Bytes> memAllocated = slave.allocated.mem();
     if (memAllocated.isNone())
@@ -1713,8 +1738,16 @@ void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
     else {
       double memAllocatedMB =
           static_cast<double>(memAllocated.get().megabytes());
+
+      LOG(INFO) << "mem allocated MB for slave "
+                << slaveId << " = " << memAllocatedMB;
+
       double memTotalMB =
           static_cast<double>(slave.total.mem().get().megabytes());
+
+      LOG(INFO) << "mem total MB for slave "
+                << slaveId << " = " << memTotalMB;
+
       slaves[slaveId].memUtilization = (memAllocatedMB / memTotalMB) * 100;
     }
 
@@ -1798,15 +1831,15 @@ void HierarchicalAllocatorProcess::allocate(
 Option<tuple<SlaveID, Resources>>
 HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
 {
+/*
   // Pick the slave randomly.
   // Randomize the order in which slaves' resources are allocated.
   // TODO(vinod): Implement a smarter sorting algorithm.
-  /*
-  std::random_shuffle(slaveIds.begin(), slaveIds.end());
-  */
+  std::list<tuple<SlaveID, Resourc  es>> slavesList (slaves.begin(), slaves.end());
+
+  std::random_shuffle(slavesList.begin(), slavesList.end());
 
   // Pick the slave using blindSort (i.e. the "balancedHeuristic").
-  /*
   Option<vector<SlaveID>> sortedIds = blindSort(slaveIds);
   if (sortedIds.isNone())
     slaveIds.clear();
@@ -1814,25 +1847,24 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
   // set a variable to jump at the end of the function (i.e. deallocate)
   else
     slaveIds = sortedIds.get();
-  */
+  /
 
   // Dummy picker: take and remove the first slave of the iterable hashmap.
-  /*
-  auto it = slaves.begin();
-  if (it == slaves.end())
+  auto it = slavesList.begin();
+  if (it == slavesList.end())
     return None();
   Option<tuple<SlaveID, Resources>> selectedSlave = Some(*it);
-  slaves.erase(it->first);
+  slaves.erase(std::get<0>(*it));
   return selectedSlave;
-  */
-
+*/
   // Pick the slave with maxResourcesHeuristic.
   if (slaves.size() == 0)
      return None();
   if (slaves.size() == 1)
       return tuple<SlaveID, Resources>(slaves.begin()->
                                        first, slaves.begin()->second);
-  return maxResourcesHeuristic(slaves);
+  return randomServerHeuristic(slaves);
+  // return maxResourcesHeuristic(slaves);
 }
 
 void HierarchicalAllocatorProcess::allocateToFrameworks(

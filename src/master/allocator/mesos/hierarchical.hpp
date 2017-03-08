@@ -226,6 +226,10 @@ protected:
   Option<std::tuple<SlaveID, Resources>> maxResourcesHeuristic
     (hashmap<SlaveID, Resources>& slaves);
 
+  // Heuristic to get the slave randomly from the slaves' list.
+  Option<std::tuple<SlaveID, Resources>> randomServerHeuristic
+    (hashmap<SlaveID, Resources>& slaves);
+
   // Idempotent helpers for pausing and resuming allocation.
   void pause();
   void resume();
@@ -374,7 +378,6 @@ protected:
     // We keep track of slave's mem utilization when its allocated resources
     // changes over time (i.e. tasks get launched or terminate).
     double memUtilization;
-
 
     // We track the total and allocated resources on the slave, the
     // available resources are computed as follows:
