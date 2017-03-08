@@ -207,7 +207,7 @@ public:
   void updateWeights(
       const std::vector<WeightInfo>& weightInfos);
 
-  void updateClusterUtilization();
+  void updateClusterUtilization(SlaveID salveId);
 
 
 protected:
@@ -366,6 +366,15 @@ protected:
     // information in sorters is not accurate if some framework
     // hasn't reregistered. See MESOS-2919 for details.
     Resources allocated;
+
+    // We keep track of slave's cpu utilization when its allocated resources
+    // changes over time (i.e. tasks get launched or terminate).
+    double cpuUtilization;
+
+    // We keep track of slave's mem utilization when its allocated resources
+    // changes over time (i.e. tasks get launched or terminate).
+    double memUtilization;
+
 
     // We track the total and allocated resources on the slave, the
     // available resources are computed as follows:

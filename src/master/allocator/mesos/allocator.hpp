@@ -156,7 +156,7 @@ public:
   void updateWeights(
       const std::vector<WeightInfo>& weightInfos);
 
-  void updateClusterUtilization();
+  void updateClusterUtilization(SlaveID slaveId);
 
 private:
   MesosAllocator();
@@ -289,7 +289,7 @@ public:
   virtual void updateWeights(
       const std::vector<WeightInfo>& weightInfos) = 0;
 
-  virtual void updateClusterUtilization() {};
+  virtual void updateClusterUtilization(SlaveID slaveId) {};
 };
 
 
@@ -655,11 +655,13 @@ inline void MesosAllocator<AllocatorProcess>::updateWeights(
 }
 
 template <typename AllocatorProcess>
-inline void MesosAllocator<AllocatorProcess>::updateClusterUtilization()
+inline void MesosAllocator<AllocatorProcess>::updateClusterUtilization(
+    SlaveID slaveId)
 {
   process::dispatch(
       process,
-      &MesosAllocatorProcess::updateClusterUtilization);
+      &MesosAllocatorProcess::updateClusterUtilization,
+      slaveId);
 }
 
 } // namespace allocator {

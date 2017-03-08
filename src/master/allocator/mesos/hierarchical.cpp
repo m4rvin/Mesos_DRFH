@@ -180,16 +180,11 @@ public:
   static double getClusterCpuUtilization(
       std::list<HierarchicalAllocatorProcess::Slave> slaves)
   {
-    double totalAllocatedCpus = 0;
-    double totalCpus = 0;
+    double clusterCpuUtilization = 0;
+    for ( auto it = slaves.begin(); it != slaves.end(); ++it )
+      clusterCpuUtilization += it->cpuUtilization;
 
-    for ( auto it = slaves.begin(); it != slaves.end(); ++it ) {
-      if (it->allocated.cpus().isSome())
-          totalAllocatedCpus += it->allocated.cpus().get();
-      CHECK_SOME(it->total.cpus());
-      totalCpus += it->total.cpus().get();
-    }
-    return (totalAllocatedCpus/totalCpus) * 100;
+    return clusterCpuUtilization/static_cast<double>(slaves.size());
   }
 
   static Bytes getSlaveAvailableMem(
@@ -212,17 +207,11 @@ public:
   static double getClusterMemUtilization(
       std::list<HierarchicalAllocatorProcess::Slave> slaves)
   {
-    Bytes totalAllocatedMem = 0;
-    Bytes totalMem = 0;
+    double clusterMemUtilization = 0;
+    for ( auto it = slaves.begin(); it != slaves.end(); ++it )
+      clusterMemUtilization += it->memUtilization;
 
-    for ( auto it = slaves.begin(); it != slaves.end(); ++it ) {
-      if (it->allocated.cpus().isSome())
-        totalAllocatedMem += it->allocated.mem().get();
-      CHECK_SOME(it->total.mem());
-      totalMem += it->total.mem().get();
-    }
-    return (static_cast<double>(totalAllocatedMem.megabytes())/
-        static_cast<double>(totalMem.megabytes())) * 100;
+    return clusterMemUtilization/static_cast<double>(slaves.size());
   }
 };
 
@@ -1485,6 +1474,8 @@ void HierarchicalAllocatorProcess::recoverResources(
             << ", allocated: " << slaves[slaveId].allocated
             << ") on agent " << slaveId
             << " from framework " << frameworkId;
+
+    updateClusterUtilization(slaveId);
   }
 
   // No need to install the filter if 'filters' is none.
@@ -1703,8 +1694,30 @@ void HierarchicalAllocatorProcess::updateWeights(
   }
 }
 
-void HierarchicalAllocatorProcess::updateClusterUtilization()
+void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
 {
+  CHECK_SOME(slaves.get(slaveId));
+  Slave slave = slaves.get(slaveId).get();
+
+  Option<double> cpusAllocated = slave.allocated.cpus();
+  if (cpusAllocated.isNone()) {
+    slaves[slaveId].cpuUtilization = 0;
+  }
+  else
+    slaves[slaveId].cpuUtilization =
+        (cpusAllocated.get() / slave.total.cpus().get()) * 100;
+
+  Option<Bytes> memAllocated = slave.allocated.mem();
+    if (memAllocated.isNone())
+      slaves[slaveId].memUtilization = 0;
+    else {
+      double memAllocatedMB =
+          static_cast<double>(memAllocated.get().megabytes());
+      double memTotalMB =
+          static_cast<double>(slave.total.mem().get().megabytes());
+      slaves[slaveId].memUtilization = (memAllocatedMB / memTotalMB) * 100;
+    }
+
   std::list<HierarchicalAllocatorProcess::Slave> slavesList = slaves.values();
   logClusterUtilizazion(slavesList);
 }
