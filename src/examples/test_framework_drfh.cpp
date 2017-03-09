@@ -254,13 +254,18 @@ void resetStats() {
 void printStats()
 {
   LOG(INFO) << endl
-            << "Allocation run#"         << allocationRunNumber << endl
-            << "Tasks launched = "       << tasksLaunched       << endl
-            << "Tasks not launched = "   << tasksNotLaunched    << endl
-            << "Offers received= "       << receivedOffers      << endl
-            << "Offers declined = "      << offersDeclined      << endl
-            << "Offers accepted = "      << offersAccepted      << endl
-            << "Offers unused = "        << offersUnused;
+            << "Allocation run#"             << allocationRunNumber      << endl
+            << "Tasks launched = "           << tasksLaunched            << endl
+            << "Tasks not launched = "       << tasksNotLaunched         << endl
+            << "Total tasks launched = "     << totalTasksLaunched       << endl
+            << "Total tasks not launched = " << totalTasksNotLaunched    << endl
+            << "Offers received= "           << receivedOffers           << endl
+            << "Offers declined = "          << offersDeclined           << endl
+            << "Offers accepted = "          << offersAccepted           << endl
+            << "Offers unused = "            << offersUnused             << endl
+            << "Total offers declined = "    << totalOffersDeclined      << endl
+            << "Total offers accepted = "    << totalOffersAccepted      << endl
+            << "Total offers unused = "      << totalOffersUnused;
 }
 
 void printOnFile() {
@@ -272,12 +277,17 @@ void printOnFile() {
   if (!myfile.is_open())
     LOG(ERROR) << "Error opening the file to ouptut stats.";
   else {
-    myfile << receivedOffers    << " "
-           << offersDeclined    << " "
-           << offersAccepted    << " "
-           << offersUnused      << " "
-           << tasksLaunched     << " "
-           << tasksNotLaunched  << endl;
+    myfile << receivedOffers        << " "
+           << offersDeclined        << " "
+           << offersAccepted        << " "
+           << offersUnused          << " "
+           << totalOffersDeclined   << " "
+           << totalOffersAccepted   << " "
+           << totalOffersUnused     << " "
+           << tasksLaunched         << " "
+           << tasksNotLaunched      << " "
+           << totalTasksLaunched    << " "
+           << totalTasksNotLaunched << endl;
     myfile.close();
   }
 }
