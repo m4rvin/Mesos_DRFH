@@ -135,19 +135,19 @@ public:
   static double getSlaveAvailableCpus(
         HierarchicalAllocatorProcess* process,
         SlaveID slaveId)
-    {
-      // retrieve total cpu capacity from the slave
-      Option<double> totalCpus = process->slaves[slaveId].total.cpus();
-      CHECK_SOME(totalCpus);
+  {
+    // retrieve total cpu capacity from the slave
+    Option<double> totalCpus = process->slaves[slaveId].total.cpus();
+    CHECK_SOME(totalCpus);
 
-      // update available and allocated cpu amount for that slave
-      double availableCpu = totalCpus.get();
-      Option<double> allocatedCpu = process->slaves[slaveId].allocated.cpus();
-      if (allocatedCpu.isSome())
-        availableCpu = totalCpus.get() - allocatedCpu.get();
+    // update available and allocated cpu amount for that slave
+    double availableCpu = totalCpus.get();
+    Option<double> allocatedCpu = process->slaves[slaveId].realAllocated.cpus();
+    if (allocatedCpu.isSome())
+      availableCpu = totalCpus.get() - allocatedCpu.get();
 
-      return availableCpu;
-    }
+    return availableCpu;
+  }
 
   /*
   static double getTotalAllocatedCpus(
@@ -197,7 +197,7 @@ public:
 
     // update available and allocated mem(MB) amount for that slave
     Bytes availableMem = totalMem.get();
-    Option<Bytes> allocatedMem = process->slaves[slaveId].allocated.mem();
+    Option<Bytes> allocatedMem = process->slaves[slaveId].realAllocated.mem();
     if (allocatedMem.isSome()) {
       availableMem = totalMem.get() - allocatedMem.get();
     }
@@ -277,7 +277,6 @@ private:
     uint64_t totalMemMB = totalMem.get().megabytes();
     uint64_t availableMemMB =
         ResourcesHelper::getSlaveAvailableMem(process, slaveId).megabytes();
-    // FIXME possible issue if not casting also the dividend?
     double availablePercentageMem =
       availableMemMB / static_cast<double>(totalMemMB);
 
