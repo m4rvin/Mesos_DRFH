@@ -156,11 +156,15 @@ public:
   void updateWeights(
       const std::vector<WeightInfo>& weightInfos);
 
-  void updateClusterUtilization(SlaveID slaveId);
+  void updateClusterUtilization(const SlaveID& slaveId);
 
-  void allocateActualResources(SlaveID slaveId, Resources toAllocate);
+  void allocateActualResources(
+      const SlaveID& slaveId,
+      const Resources& toAllocate);
 
-  void deallocateActualResources(SlaveID slaveId, Resources toDeallocate);
+  void deallocateActualResources(
+      const SlaveID& slaveId,
+      const Resources& toDeallocate);
 
 
 private:
@@ -294,15 +298,15 @@ public:
   virtual void updateWeights(
       const std::vector<WeightInfo>& weightInfos) = 0;
 
-  virtual void updateClusterUtilization(SlaveID slaveId) {};
+  virtual void updateClusterUtilization(const SlaveID& slaveId) {};
 
   virtual void allocateActualResources(
-      SlaveID slaveId,
-      Resources toAllocate) {};
+      const SlaveID& slaveId,
+      const Resources& toAllocate) {};
 
   virtual void deallocateActualResources(
-      SlaveID slaveId,
-      Resources toDeallocate) {};
+      const SlaveID& slaveId,
+      const Resources& toDeallocate) {};
 };
 
 
@@ -669,7 +673,7 @@ inline void MesosAllocator<AllocatorProcess>::updateWeights(
 
 template <typename AllocatorProcess>
 inline void MesosAllocator<AllocatorProcess>::updateClusterUtilization(
-    SlaveID slaveId)
+    const SlaveID& slaveId)
 {
   process::dispatch(
       process,
@@ -679,8 +683,8 @@ inline void MesosAllocator<AllocatorProcess>::updateClusterUtilization(
 
 template <typename AllocatorProcess>
 inline void MesosAllocator<AllocatorProcess>::allocateActualResources(
-    SlaveID slaveId,
-    Resources toAllocate)
+    const SlaveID& slaveId,
+    const Resources& toAllocate)
 {
   process::dispatch(
       process,
@@ -691,8 +695,8 @@ inline void MesosAllocator<AllocatorProcess>::allocateActualResources(
 
 template <typename AllocatorProcess>
 inline void MesosAllocator<AllocatorProcess>::deallocateActualResources(
-    SlaveID slaveId,
-    Resources toDeallocate)
+    const SlaveID& slaveId,
+    const Resources& toDeallocate)
 {
   process::dispatch(
       process,

@@ -134,7 +134,7 @@ class ResourcesHelper
 public:
   static double getSlaveAvailableCpus(
         HierarchicalAllocatorProcess* process,
-        SlaveID slaveId)
+        const SlaveID& slaveId)
   {
     // retrieve total cpu capacity from the slave
     Option<double> totalCpus = process->slaves[slaveId].total.cpus();
@@ -178,7 +178,7 @@ public:
   */
 
   static double getClusterCpuUtilization(
-      std::list<HierarchicalAllocatorProcess::Slave> slaves)
+      const std::list<HierarchicalAllocatorProcess::Slave>& slaves)
   {
     double clusterCpuUtilization = 0;
     for ( auto it = slaves.begin(); it != slaves.end(); ++it )
@@ -189,7 +189,7 @@ public:
 
   static Bytes getSlaveAvailableMem(
           HierarchicalAllocatorProcess* process,
-          SlaveID slaveId)
+          const SlaveID& slaveId)
   {
     // retrieve total mem capacity from a slave
     Option<Bytes> totalMem = process->slaves[slaveId].total.mem();
@@ -205,7 +205,7 @@ public:
   }
 
   static double getClusterMemUtilization(
-      std::list<HierarchicalAllocatorProcess::Slave> slaves)
+      const std::list<HierarchicalAllocatorProcess::Slave>& slaves)
   {
     double clusterMemUtilization = 0;
     for ( auto it = slaves.begin(); it != slaves.end(); ++it )
@@ -569,7 +569,7 @@ Option<std::tuple<SlaveID, Resources>>
 }
 
 void HierarchicalAllocatorProcess::logClusterUtilizazion(
-    std::list<HierarchicalAllocatorProcess::Slave> slavesList)
+    const std::list<HierarchicalAllocatorProcess::Slave>& slavesList)
 {
   double cpuUtilization = ResourcesHelper::getClusterCpuUtilization(slavesList);
   double memUtilization = ResourcesHelper::getClusterMemUtilization(slavesList);
@@ -1712,7 +1712,8 @@ void HierarchicalAllocatorProcess::updateWeights(
   }
 }
 
-void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
+void HierarchicalAllocatorProcess::updateClusterUtilization(
+    const SlaveID& slaveId)
 {
   CHECK_SOME(slaves.get(slaveId));
   Slave slave = slaves.get(slaveId).get();
@@ -1756,16 +1757,16 @@ void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
 }
 
 void HierarchicalAllocatorProcess::allocateActualResources(
-    SlaveID slaveId,
-    Resources toAllocate)
+    const SlaveID& slaveId,
+    const Resources& toAllocate)
 {
   slaves[slaveId].realAllocated += toAllocate;
   updateClusterUtilization(slaveId);
 }
 
 void HierarchicalAllocatorProcess::deallocateActualResources(
-    SlaveID slaveId,
-    Resources toDeallocate)
+    const SlaveID& slaveId,
+    const Resources& toDeallocate)
 {
   slaves[slaveId].realAllocated -= toDeallocate;
   updateClusterUtilization(slaveId);

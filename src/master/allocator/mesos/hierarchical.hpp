@@ -207,11 +207,15 @@ public:
   void updateWeights(
       const std::vector<WeightInfo>& weightInfos);
 
-  void updateClusterUtilization(SlaveID slaveId);
+  void updateClusterUtilization(const SlaveID& slaveId);
 
-  void allocateActualResources(SlaveID slaveId, Resources toAllocate);
+  void allocateActualResources(
+      const SlaveID& slaveId,
+      const Resources& toAllocate);
 
-  void deallocateActualResources(SlaveID slaveId, Resources toDeallocate);
+  void deallocateActualResources(
+      const SlaveID& slaveId,
+      const Resources& toDeallocate);
 
 
 protected:
@@ -526,7 +530,7 @@ protected:
   const std::function<Sorter*()> frameworkSorterFactory;
 
 
-  void logClusterUtilizazion(std::list<Slave> slavesList);
+  void logClusterUtilizazion(const std::list<Slave>& slavesList);
 };
 
 
