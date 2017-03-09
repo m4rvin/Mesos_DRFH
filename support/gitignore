@@ -39,5 +39,10 @@ missing
 .project
 .settings/*
 
+# Execution generated files
+ClusterHandling/TESTS/
+ClusterHandling/OUTPUT/
+ClusterHandling/clusterNodesPids
+
 # Various
 clusterNodesPids
