@@ -115,7 +115,7 @@ std::default_random_engine tasksInterarrivalTimeGenerator;
   tasksInterarrivalTimeLogNormDistribution60(4.064, 0.25);
 */
 std::exponential_distribution<double>
-  tasksInterarrivalTimeExpDistribution_A(4.8);
+  tasksInterarrivalTimeExpDistribution_A(3.6);
 
 // Task duration distributions
 /*std::lognormal_distribution<double>
