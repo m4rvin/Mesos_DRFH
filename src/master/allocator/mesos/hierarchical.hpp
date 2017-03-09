@@ -219,12 +219,10 @@ protected:
   typedef HierarchicalAllocatorProcess Self;
   typedef HierarchicalAllocatorProcess This;
 
-  // Blind sorting of slaves
-  Option<std::vector<SlaveID>>
-    balancedResourcesHeuristic(const std::vector<SlaveID>& slaveIds);
-
-  std::tuple<double, uint64_t> findMaxResourcesCapacity(
-      const std::vector<SlaveID>& slaveIds);
+  // Heuristic to get the slave with balanced resources (i.e. similar
+  // percentages of cpu-mem available.
+  Option<std::tuple<SlaveID, Resources>>
+    balancedResourcesHeuristic(hashmap<SlaveID, Resources>& slaves);
 
   // Heuristic to get the slave with the highest Resources.
   Option<std::tuple<SlaveID, Resources>> maxResourcesHeuristic

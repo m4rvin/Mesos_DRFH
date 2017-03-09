@@ -213,6 +213,28 @@ public:
 
     return clusterMemUtilization/static_cast<double>(slaves.size());
   }
+
+  // Look for the maximum resources capacity in the cluster.
+  static tuple<double, uint64_t> findMaxResourcesCapacity(
+      const hashmap<SlaveID, HierarchicalAllocatorProcess::Slave>& slaves)
+  {
+    double maxCpu = 0.0;
+    uint64_t maxMemMB = 0;
+
+    for (const auto& it : slaves) {
+      Option<double> totalCpu = it.second.total.cpus();
+      CHECK_SOME(totalCpu);
+      Option<Bytes> totalMem = it.second.total.mem();
+      CHECK_SOME(totalMem);
+
+      if (totalCpu.get() > maxCpu)
+        maxCpu = totalCpu.get();
+      if(totalMem.get().megabytes() > maxMemMB )
+        maxMemMB = totalMem.get().megabytes();
+    }
+
+    return tuple<double, uint64_t> (maxCpu, maxMemMB);
+  }
 };
 
 class ComplexResourcesRepresentation
@@ -221,8 +243,8 @@ public:
   static Option<ComplexResourcesRepresentation>
     createComplexResourcesRepresentation(
         HierarchicalAllocatorProcess* process,
-        SlaveID slaveId,
-        tuple<double, uint64_t> maxResources)
+        const SlaveID& slaveId,
+        const tuple<double, uint64_t>& maxResources)
   {
     ComplexResourcesRepresentation complexRR(process, slaveId, maxResources);
     // Check resources availability is not greater than 100%
@@ -238,7 +260,7 @@ public:
   }
 
   static bool complexResourceIsBalanced(
-      ComplexResourcesRepresentation complexRR)
+      const ComplexResourcesRepresentation& complexRR)
   {
     if(complexRR.checkUpperBound() && complexRR.checkLowerBound())
       return true;
@@ -258,8 +280,8 @@ private:
 
   ComplexResourcesRepresentation(
       HierarchicalAllocatorProcess* process,
-      SlaveID slaveId,
-      tuple<double, uint64_t> maxResources)
+      const SlaveID& slaveId,
+      const tuple<double, uint64_t>& maxResources)
   {
     // retrieve total cpu capacity from a slave
     Option<double> totalCpu = process->slaves[slaveId].total.cpus();
@@ -304,7 +326,7 @@ private:
             << complexResources;
   }
 
-  bool checkUpperBound()
+  bool checkUpperBound() const
   {
     double real = this->complexResources.real();
     if(real >= 0.9) return true;
@@ -314,7 +336,7 @@ private:
     return true;
   }
 
-  bool checkLowerBound()
+  bool checkLowerBound() const
   {
     double imag = this->complexResources.imag();
     if(imag >= 0.9) return true;
@@ -325,28 +347,6 @@ private:
   }
 };
 
-tuple<double, uint64_t>
-HierarchicalAllocatorProcess::findMaxResourcesCapacity(
-    const vector<SlaveID>& slaveIds)
-{
-  double maxCpu = 0.0;
-  uint64_t maxMemMB = 0;
-
-  foreach(const SlaveID& slaveId, slaveIds)
-  {
-    Option<double> totalCpu = this->slaves[slaveId].total.cpus();
-    CHECK_SOME(totalCpu);
-    Option<Bytes> totalMem = this->slaves[slaveId].total.mem();
-    CHECK_SOME(totalMem);
-
-    if (totalCpu.get() > maxCpu)
-      maxCpu = totalCpu.get();
-    if(totalMem.get().megabytes() > maxMemMB )
-      maxMemMB = totalMem.get().megabytes();
-  }
-
-  return tuple<double, double> (maxCpu, maxMemMB);
-}
 
 Option<tuple<SlaveID, Resources>>
   HierarchicalAllocatorProcess::randomServerHeuristic
@@ -495,74 +495,77 @@ Option<tuple<SlaveID, Resources>>
   return slaveChosen;
 }
 
-Option<vector<SlaveID>>
+Option<std::tuple<SlaveID, Resources>>
   HierarchicalAllocatorProcess::balancedResourcesHeuristic(
-      const vector<SlaveID>& slaveIds)
+      hashmap<SlaveID, Resources>& availableSlaves)
 {
-  VLOG(blind_policy_log_level) << "EXECUTING BLINDSORT";
-  if (slaveIds.size() > 0)
+  LOG(INFO) << "STARTING balancedResourcesHeuristic";
+
+  tuple<double, uint64_t> maxResources =
+      ResourcesHelper::findMaxResourcesCapacity(slaves);
+
+  LOG(INFO) << "The current pseudo-server with maximum resources capacity has:"
+            << endl << "cpu = " << std::get<0>(maxResources) << endl
+            << "mem = " << std::get<1>(maxResources) << "MB";
+
+  vector<SlaveID> balancedSlaveIds;
+  balancedSlaveIds.reserve(availableSlaves.size()/2);
+  vector<SlaveID> unbalancedSlaveIds;
+  unbalancedSlaveIds.reserve(availableSlaves.size()/2);
+
+  int unusableSlaves = 0;
+
+  for (const auto& it : availableSlaves)
   {
-    tuple<double, uint64_t> maxResources =
-        findMaxResourcesCapacity(slaveIds);
-    vector<SlaveID> balancedSlaveIds;
-    balancedSlaveIds.reserve(slaveIds.size());
-    vector<SlaveID> unbalancedSlaveIds;
-    int unusableSlaves = 0;
-
-    foreach(const SlaveID& slaveId, slaveIds)
+    Option<ComplexResourcesRepresentation> complexRR =
+        ComplexResourcesRepresentation::createComplexResourcesRepresentation(
+            this,
+            it.first, maxResources);
+    if (complexRR.isNone())
     {
-      Option<ComplexResourcesRepresentation> complexRR =
-          ComplexResourcesRepresentation::createComplexResourcesRepresentation(
-              this,
-              slaveId, maxResources);
-      if (complexRR.isNone())
-      {
-        unusableSlaves++;
-        continue;
-      }
-      if (ComplexResourcesRepresentation::complexResourceIsBalanced(
-          complexRR.get()))
-      {
-        VLOG(blind_policy_log_level) << "RESOURCE is balanced";
-        balancedSlaveIds.push_back(complexRR.get().getResourcesSlaveID());
-      }
-      else
-      {
-        VLOG(blind_policy_log_level) << "RESOURCE is NOT balanced";
-        unbalancedSlaveIds.push_back(complexRR.get().getResourcesSlaveID());
-      }
+      unusableSlaves++;
+      continue;
     }
-
-    if (unusableSlaves == static_cast<int>(slaveIds.size()))
+    if (ComplexResourcesRepresentation::complexResourceIsBalanced(
+        complexRR.get()))
     {
-      VLOG(blind_policy_log_level) << "No slave has usable resources.";
-          return None();
+      VLOG(blind_policy_log_level) << "RESOURCE is balanced";
+      balancedSlaveIds.push_back(complexRR.get().getResourcesSlaveID());
     }
-    vector<SlaveID> sortedSlaveIds;
-    sortedSlaveIds.reserve(slaveIds.size() - unusableSlaves);
+    else
+    {
+      VLOG(blind_policy_log_level) << "RESOURCE is NOT balanced";
+      unbalancedSlaveIds.push_back(complexRR.get().getResourcesSlaveID());
+    }
+  }
 
-    // randomize balanced and unbalanced slaves separately
+  if (unusableSlaves == static_cast<int>(availableSlaves.size()))
+  {
+    VLOG(blind_policy_log_level) << "No slave has usable resources.";
+        return None();
+  }
+
+  SlaveID selectedSlaveId;
+  if (balancedSlaveIds.size() != 0) {
+    // randomize balanced before getting the slave
     std::random_shuffle(balancedSlaveIds.begin(), balancedSlaveIds.end());
+    selectedSlaveId = balancedSlaveIds[0];
+  }
+  else {
+    // randomize unbalanced before getting the slave
     std::random_shuffle(unbalancedSlaveIds.begin(), unbalancedSlaveIds.end());
-
-    // put in the sorted list the balanced slaves first and unbalanced later
-    foreach(const SlaveID& slaveId, balancedSlaveIds)
-    {
-      sortedSlaveIds.push_back(slaveId);
-    }
-    foreach(const SlaveID& slaveId, unbalancedSlaveIds)
-    {
-      sortedSlaveIds.push_back(slaveId);
-    }
-
-    return Option<vector<SlaveID>> (sortedSlaveIds);
+    selectedSlaveId = unbalancedSlaveIds[0];
   }
-  else
-  {
-    VLOG(blind_policy_log_level) <<
-    "No slave from which to take resources from...";
-    return None();
-  }
+  Option<std::tuple<SlaveID, Resources>> selected =
+      std::make_tuple(
+          selectedSlaveId,
+          availableSlaves.get(selectedSlaveId).get());
+
+  LOG(INFO) << "balancedResourcesHeuristic chose slave: " << selectedSlaveId;
+
+  CHECK_EQ(static_cast<int>(availableSlaves.erase(selectedSlaveId)), 1);
+
+  return selected;
 }
 
 void HierarchicalAllocatorProcess::logClusterUtilizazion(
@@ -1875,8 +1878,9 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
   if (slaves.size() == 1)
       return tuple<SlaveID, Resources>(slaves.begin()->
                                        first, slaves.begin()->second);
-  return randomServerHeuristic(slaves);
+  // return randomServerHeuristic(slaves);
   // return maxResourcesHeuristic(slaves);
+  return balancedResourcesHeuristic(slaves);
 }
 
 void HierarchicalAllocatorProcess::allocateToFrameworks(
