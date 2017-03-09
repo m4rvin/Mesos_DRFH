@@ -294,6 +294,9 @@ protected:
 
   bool allocatable(const Resources& resources);
 
+  // Returns true if all the resources are allocatable
+  bool allAllocatable(const Resources& resources);
+
   bool initialized;
   bool paused;
 

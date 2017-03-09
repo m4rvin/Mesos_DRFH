@@ -1917,8 +1917,15 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
   foreach (const SlaveID& slaveId, slaveIds_) {
     if (isWhitelisted(slaveId) && slaves[slaveId].activated) {
       Resources available = slaves[slaveId].total - slaves[slaveId].allocated;
-      if (allocatable(available))
+      // TODO(danang) this way we don't support aggregating offers from the same
+      // slave in the framework. Enabling support imply check the heuristics'
+      // behaviour when not all resources are available.
+      if (allAllocatable(available))
         slavesResources.insert({slaveId, available});
+      else
+        LOG(INFO) << "Excluding slave " << slaveId
+                  << " from this allocation cycle because missing some"
+                      " (allocatable) resources => " << available;
     }
   }
 
@@ -2653,6 +2660,16 @@ bool HierarchicalAllocatorProcess::allocatable(
   Option<Bytes> mem = resources.mem();
 
   return (cpus.isSome() && cpus.get() >= MIN_CPUS) ||
+         (mem.isSome() && mem.get() >= MIN_MEM);
+}
+
+bool HierarchicalAllocatorProcess::allAllocatable(
+    const Resources& resources)
+{
+  Option<double> cpus = resources.cpus();
+  Option<Bytes> mem = resources.mem();
+
+  return (cpus.isSome() && cpus.get() >= MIN_CPUS) &&
          (mem.isSome() && mem.get() >= MIN_MEM);
 }
 
