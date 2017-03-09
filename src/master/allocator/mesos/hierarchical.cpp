@@ -1492,8 +1492,6 @@ void HierarchicalAllocatorProcess::recoverResources(
             << ", allocated: " << slaves[slaveId].allocated
             << ") on agent " << slaveId
             << " from framework " << frameworkId;
-
-    updateClusterUtilization(slaveId);
   }
 
   // No need to install the filter if 'filters' is none.
@@ -1717,7 +1715,7 @@ void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
   CHECK_SOME(slaves.get(slaveId));
   Slave slave = slaves.get(slaveId).get();
 
-  Option<double> cpusAllocated = slave.allocated.cpus();
+  Option<double> cpusAllocated = slave.realAllocated.cpus();
   if (cpusAllocated.isNone()) {
     slaves[slaveId].cpuUtilization = 0;
   }
@@ -1732,7 +1730,7 @@ void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
               << " = " << slave.total.cpus().get();
   }
 
-  Option<Bytes> memAllocated = slave.allocated.mem();
+  Option<Bytes> memAllocated = slave.realAllocated.mem();
     if (memAllocated.isNone())
       slaves[slaveId].memUtilization = 0;
     else {
@@ -1755,6 +1753,21 @@ void HierarchicalAllocatorProcess::updateClusterUtilization(SlaveID slaveId)
   logClusterUtilizazion(slavesList);
 }
 
+void HierarchicalAllocatorProcess::allocateActualResources(
+    SlaveID slaveId,
+    Resources toAllocate)
+{
+  slaves[slaveId].realAllocated += toAllocate;
+  updateClusterUtilization(slaveId);
+}
+
+void HierarchicalAllocatorProcess::deallocateActualResources(
+    SlaveID slaveId,
+    Resources toDeallocate)
+{
+  slaves[slaveId].realAllocated -= toDeallocate;
+  updateClusterUtilization(slaveId);
+}
 
 void HierarchicalAllocatorProcess::pause()
 {

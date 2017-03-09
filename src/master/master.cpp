@@ -3764,6 +3764,10 @@ void Master::_accept(
   // launched, we remove its resource from offered resources.
   Resources _offeredResources = offeredResources;
 
+  // We also keep track of consumedResources (the ones effectively used by
+  // tasks when they get launched.
+  Resources _consumedResources;
+
   // We keep track of the shared resources from the offers separately.
   // `offeredSharedResources` can be modified by CREATE/DESTROY but we
   // don't remove from it when a task is successfully launched so this
@@ -4184,6 +4188,7 @@ void Master::_accept(
               << available << " does not contain " << consumed;
 
             _offeredResources -= consumed;
+            _consumedResources += consumed;
 
             // TODO(bmahler): Consider updating this log message to
             // indicate when the executor is also being launched.
@@ -4381,6 +4386,7 @@ void Master::_accept(
             << _offeredResources << " does not contain " << consumed;
 
           _offeredResources -= consumed;
+          _consumedResources += consumed;
 
           if (HookManager::hooksAvailable()) {
             // Set labels retrieved from label-decorator hooks.
@@ -4417,6 +4423,21 @@ void Master::_accept(
         operations);
   }
 
+  LOG(INFO) << "Effective resources demand by framework " << frameworkId
+            << " on slave " << slaveId
+            << " => " << _consumedResources
+            << " over offered => " << offeredResources;
+
+  if (!_consumedResources.empty())
+    allocator->allocateActualResources(
+            slaveId,
+            _consumedResources);
+
+  // NB: resources not yet used are tracked using deallocateActualResources()
+  // Currently it has been set only for task termination
+  // TODO(danang) look for other conditions where it is necessary to take back
+  // resources (e.g. framework termination/abort, ...).
+
   if (!_offeredResources.empty()) {
     // Tell the allocator about the unused (e.g., refused) resources.
     allocator->recoverResources(
@@ -4425,11 +4446,6 @@ void Master::_accept(
         _offeredResources,
         accept.filters());
   }
-  else
-    // If some resources have been allocated to and will be used by frameworks'
-    // tasks, then the utilization will change, otherwise it will be the same.
-    // In both cases we want to update it.
-    allocator->updateClusterUtilization(slaveId);
 }
 
 
@@ -7663,6 +7679,10 @@ void Master::updateTask(Task* task, const StatusUpdate& update)
         task->resources(),
         None());
 
+    allocator->deallocateActualResources(
+        task->slave_id(),
+        task->resources());
+
     // The slave owns the Task object and cannot be nullptr.
     Slave* slave = slaves.registered.get(task->slave_id());
     CHECK_NOTNULL(slave);
@@ -7745,6 +7765,11 @@ void Master::removeTask(Task* task)
         task->slave_id(),
         task->resources(),
         None());
+
+    allocator->deallocateActualResources(
+        task->slave_id(),
+        task->resources());
+
   } else {
     LOG(INFO) << "Removing task " << task->task_id()
               << " with resources " << task->resources()

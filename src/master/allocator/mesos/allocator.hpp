@@ -158,6 +158,11 @@ public:
 
   void updateClusterUtilization(SlaveID slaveId);
 
+  void allocateActualResources(SlaveID slaveId, Resources toAllocate);
+
+  void deallocateActualResources(SlaveID slaveId, Resources toDeallocate);
+
+
 private:
   MesosAllocator();
   MesosAllocator(const MesosAllocator&); // Not copyable.
@@ -290,6 +295,14 @@ public:
       const std::vector<WeightInfo>& weightInfos) = 0;
 
   virtual void updateClusterUtilization(SlaveID slaveId) {};
+
+  virtual void allocateActualResources(
+      SlaveID slaveId,
+      Resources toAllocate) {};
+
+  virtual void deallocateActualResources(
+      SlaveID slaveId,
+      Resources toDeallocate) {};
 };
 
 
@@ -663,6 +676,31 @@ inline void MesosAllocator<AllocatorProcess>::updateClusterUtilization(
       &MesosAllocatorProcess::updateClusterUtilization,
       slaveId);
 }
+
+template <typename AllocatorProcess>
+inline void MesosAllocator<AllocatorProcess>::allocateActualResources(
+    SlaveID slaveId,
+    Resources toAllocate)
+{
+  process::dispatch(
+      process,
+      &MesosAllocatorProcess::allocateActualResources,
+      slaveId,
+      toAllocate);
+}
+
+template <typename AllocatorProcess>
+inline void MesosAllocator<AllocatorProcess>::deallocateActualResources(
+    SlaveID slaveId,
+    Resources toDeallocate)
+{
+  process::dispatch(
+      process,
+      &MesosAllocatorProcess::deallocateActualResources,
+      slaveId,
+      toDeallocate);
+}
+
 
 } // namespace allocator {
 } // namespace master {

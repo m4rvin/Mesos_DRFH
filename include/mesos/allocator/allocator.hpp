@@ -394,12 +394,27 @@ public:
   virtual void updateWeights(
       const std::vector<WeightInfo>& weightInfos) = 0;
 
-
   /**
    * Update utilization of the cluster resources analyzing all allocated
    * and total resources for every slave.
    */
   virtual void updateClusterUtilization(SlaveID slaveId) {};
+
+  /**
+   * Update the real allocated resources for a slave adding the amount
+   * confirmed for use by the task.
+   */
+  virtual void allocateActualResources(
+      SlaveID slaveId,
+      Resources toAllocate) {};
+
+  /**
+   * Update the real allocated resources for a slave removing the amount
+   * released by the task.
+   */
+  virtual void deallocateActualResources(
+      SlaveID slaveId,
+      Resources toDeallocate) {};
 };
 
 } // namespace allocator {
