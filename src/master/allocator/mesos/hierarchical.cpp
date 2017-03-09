@@ -1998,8 +1998,7 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
       VLOG(1) << "Selected agent " << slaveId
               << ", with resources " << resources
               << ", for framework " << frameworkId.value();
-      // If the framework filters these resources, ignore. The unallocated
-      // part of the quota will not be allocated to other roles.
+      // If the framework filters these resources, ignore.
       if (isFiltered(frameworkId, slaveId, resources)) {
         continue;
       }
