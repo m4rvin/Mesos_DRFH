@@ -67,13 +67,14 @@ std::mutex _lock;
 uint64_t queuedTasksNumber = 0;
 
 int receivedOffers = 0;
-int totalOffersReceived = 0;
 
 uint64_t totalTasksLaunched = 0;
 uint64_t totalTasksNotLaunched = 0;
 uint64_t totalOffersDeclined = 0;
 uint64_t totalOffersAccepted = 0;
 uint64_t totalOffersUnused = 0;
+uint64_t totalOffersReceived = 0;
+
 
 uint64_t allocationRunNumber = 0;
 uint64_t tasksLaunched = 0;
@@ -101,7 +102,7 @@ FrameworkType frameworkType;
 double cpusTaskDemand;
 Bytes memTaskDemand;
 Resources TASK_RESOURCES;
-int maxOffersReceivable;
+uint64_t maxOffersReceivable;
 Option<string> statsFilepath;
 
 static const double CPUS_PER_EXECUTOR = 0.1;
@@ -257,15 +258,10 @@ void printStats()
             << "Allocation run#"             << allocationRunNumber      << endl
             << "Tasks launched = "           << tasksLaunched            << endl
             << "Tasks not launched = "       << tasksNotLaunched         << endl
-            << "Total tasks launched = "     << totalTasksLaunched       << endl
-            << "Total tasks not launched = " << totalTasksNotLaunched    << endl
             << "Offers received= "           << receivedOffers           << endl
             << "Offers declined = "          << offersDeclined           << endl
             << "Offers accepted = "          << offersAccepted           << endl
-            << "Offers unused = "            << offersUnused             << endl
-            << "Total offers declined = "    << totalOffersDeclined      << endl
-            << "Total offers accepted = "    << totalOffersAccepted      << endl
-            << "Total offers unused = "      << totalOffersUnused;
+            << "Offers unused = "            << offersUnused ;
 }
 
 void printOnFile() {
@@ -284,6 +280,7 @@ void printOnFile() {
            << totalOffersDeclined   << " "
            << totalOffersAccepted   << " "
            << totalOffersUnused     << " "
+           << totalOffersReceived   << " "
            << tasksLaunched         << " "
            << tasksNotLaunched      << " "
            << totalTasksLaunched    << " "
