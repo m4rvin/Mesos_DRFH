@@ -43,6 +43,7 @@
 #include <stout/os.hpp>
 #include <stout/path.hpp>
 #include <stout/stringify.hpp>
+#include <stout/strings.hpp>
 
 #include "logging/flags.hpp"
 #include "logging/logging.hpp"
@@ -116,7 +117,7 @@ std::mt19937 tasksInterarrivalTimeGenerator;
   tasksInterarrivalTimeLogNormDistribution60(4.064, 0.25);
 */
 std::exponential_distribution<double>
-  tasksInterarrivalTimeExpDistribution_A(3.6);
+  tasksInterarrivalTimeExpDistribution_A;
 
 // Task duration distributions
 /*std::lognormal_distribution<double>
@@ -500,6 +501,31 @@ void run()
   }
 }
 
+void setupDistributions(const string& configuration)
+{
+  vector<string> tokens = strings::split(configuration, ",");
+
+  if (tokens.size() == 3) {
+    if(tokens[0].compare("N") == 0) {
+      LOG(INFO) << "Selected a Gamma distribution.";
+      // TODO(danang) check the fields
+      return;
+    }
+  } else if(tokens.size() == 2) {
+    if(tokens[0].compare("E") == 0) {
+      double lambda = lexical_cast<double>(tokens[1]);
+      LOG(INFO) << "Selected an Exponential distribution with lambda="
+                << lambda << " => E[X]=" << 1/lambda;
+      tasksInterarrivalTimeExpDistribution_A =
+          std::exponential_distribution<double>(lambda);
+      return;
+    }
+  }
+
+  LOG(ERROR) << "Wrong format for the distribution configuration.";
+  exit(EXIT_FAILURE);
+}
+
 int main(int argc, char** argv)
 {
   // Find this executable's directory to locate executor.
@@ -589,6 +615,14 @@ int main(int argc, char** argv)
             "generators_seed",
             "seed to use for the internal pseudorandom generators.");
 
+  Option<string> interarrivals_distribution;
+  flags.add(&interarrivals_distribution,
+            "interarrivals_distribution",
+            "distribution to use for the interarrival of tasks.\n"
+            "   Examples:\n"
+            "   E,lambda\n"
+            "   N,u,stddev");
+
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
   if (load.isError()) {
@@ -603,6 +637,21 @@ int main(int argc, char** argv)
     cerr << "Missing --framework_type" << endl;
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
+  } else if (generators_seed.isNone()) {
+    cerr << "Missing --generators_seed" << endl;
+    usage(argv[0], flags);
+    exit(EXIT_FAILURE);
+  } else if (interarrivals_distribution.isNone()) {
+    cerr << "Missing --interarrivals_distribution" << endl;
+    usage(argv[0], flags);
+    exit(EXIT_FAILURE);
+  }
+
+  internal::logging::initialize(argv[0], flags, true); // Catch signals.
+
+  // Log any flag warnings (after logging is initialized).
+  foreach (const flags::Warning& warning, load->warnings) {
+    LOG(WARNING) << warning.message;
   }
 
   if (frameworkTypeString.get().compare("common") == 0)
@@ -634,12 +683,7 @@ int main(int argc, char** argv)
       generators_seed.get().end());
   tasksInterarrivalTimeGenerator = std::mt19937(seed);
 
-  internal::logging::initialize(argv[0], flags, true); // Catch signals.
-
-  // Log any flag warnings (after logging is initialized).
-  foreach (const flags::Warning& warning, load->warnings) {
-    LOG(WARNING) << warning.message;
-  }
+  setupDistributions(interarrivals_distribution.get());
 
   ExecutorInfo executor;
   executor.mutable_executor_id()->set_value("default");
