@@ -16,6 +16,7 @@
 
 #include <glog/logging.h>
 
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <random>
@@ -63,6 +64,8 @@ using std::list;
 
 using mesos::Resources;
 
+std::chrono::steady_clock::time_point start;
+std::chrono::duration<double> frameworkDuration;
 
 std::mutex _lock;
 uint64_t queuedTasksNumber = 0;
@@ -290,6 +293,14 @@ void printOnFile() {
   }
 }
 
+bool checkStoppableFramework() {
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed = end-start;
+
+  if (elapsed.count() >= frameworkDuration.count())
+     return true;
+  return false;
+}
 
 class TestScheduler : public Scheduler
 {
@@ -320,6 +331,12 @@ public:
   virtual void resourceOffers(SchedulerDriver* driver,
                                 const vector<Offer>& offers)
   {
+    if(checkStoppableFramework()) {
+      driver->stop();
+      LOG(INFO) << "STOPPING FRAMEWORK";
+      exit(EXIT_SUCCESS);
+    }
+
     uint64_t lastReadQueuedTaskNumber;
     allocationRunNumber++;
     foreach (const Offer& offer, offers) {
@@ -754,6 +771,9 @@ int main(int argc, char** argv)
        run();
      });
   thread.detach();
+
+  start = std::chrono::steady_clock::now();
+  frameworkDuration =  std::chrono::duration<double>(10);
 
   int status = driver->run() == DRIVER_STOPPED ? 0 : 1;
 
