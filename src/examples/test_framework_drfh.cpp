@@ -107,7 +107,7 @@ Option<string> statsFilepath;
 static const double CPUS_PER_EXECUTOR = 0.1;
 static const int32_t MEM_PER_EXECUTOR = 32;
 
-std::default_random_engine tasksInterarrivalTimeGenerator;
+std::mt19937 tasksInterarrivalTimeGenerator;
 // std::default_random_engine taskDurationGenerator;
 
 // Interarrival time distributions
@@ -587,6 +587,11 @@ int main(int argc, char** argv)
            "Options are: common, low."
            );
 
+  Option<string> generators_seed;
+  flags.add(&generators_seed,
+            "generators_seed",
+            "seed to use for the internal pseudorandom generators.");
+
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
   if (load.isError()) {
@@ -626,6 +631,11 @@ int main(int argc, char** argv)
               ";mem:" + stringify(memTaskDemand.megabytes())).get();
 
   LOG(INFO) << "Task resources for this framework will be: " << TASK_RESOURCES;
+
+  std::seed_seq seed(
+      generators_seed.get().begin(),
+      generators_seed.get().end());
+  tasksInterarrivalTimeGenerator = std::mt19937(seed);
 
   internal::logging::initialize(argv[0], flags, true); // Catch signals.
 

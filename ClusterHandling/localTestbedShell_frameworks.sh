@@ -15,7 +15,7 @@ echo "LAUNCHING FRAMEWORKS"
 
 cd $MESOS_FRAMEWORK_EXECUTABLES_PATH
 
-./test-framework-drfh --master=127.0.0.1:5050 --framework_type=low --task_cpus_demand=1 --task_memory_demand=128MB --offers_limit=200 --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " &
+./test-framework-drfh --master=127.0.0.1:5050 --framework_type=low --task_cpus_demand=1 --task_memory_demand=128MB --offers_limit=200 --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework1" &
 pid=$!
 echo $pid
 
