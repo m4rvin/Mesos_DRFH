@@ -80,30 +80,12 @@ uint64_t totalOffersAccepted = 0;
 uint64_t totalOffersUnused = 0;
 uint64_t totalOffersReceived = 0;
 
-
 uint64_t allocationRunNumber = 0;
 uint64_t tasksLaunched = 0;
 uint64_t tasksNotLaunched = 0;
 uint64_t offersDeclined = 0;
 uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
-
-/*
-enum class FrameworkType { COMMON, LOW};
-
-std::ostream& operator<<(std::ostream& os, FrameworkType f)
-{
-    switch(f)
-    {
-        case FrameworkType::COMMON   : os << "common";    break;
-        case FrameworkType::LOW      : os << "low";       break;
-        default                     : os.setstate(std::ios_base::failbit);
-    }
-    return os;
-}
-
-FrameworkType frameworkType;
-*/
 
 double cpusTaskDemand;
 Bytes memTaskDemand;
@@ -378,10 +360,6 @@ public:
     if (!implicitAcknowledgements) {
       driver->acknowledgeStatusUpdate(status);
     }
-
-    /*if (tasksFinished == totalTasks) {
-      driver->stop();
-    }*/
   }
 
   virtual void frameworkMessage(SchedulerDriver* driver,
@@ -561,17 +539,6 @@ int main(int argc, char** argv)
          "write stats. NB: if not specified no stats will be printed on file."
          );
 
-  /*
-  Option<string> frameworkTypeString;
-  flags.add(&frameworkTypeString,
-           "framework_type",
-           "The framework type to launch. This imply the use of predefined "
-           "distributions to generate tasks/duration/interarrival time. "
-           "Each type has its own distributions.\n"
-           "Options are: common, low."
-           );
-   */
-
   Option<string> generators_seed;
   flags.add(&generators_seed,
             "generators_seed",
@@ -604,12 +571,6 @@ int main(int argc, char** argv)
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
   }
-  /*
-   } else if (frameworkTypeString.isNone()) {
-    cerr << "Missing --framework_type" << endl;
-    usage(argv[0], flags);
-    exit(EXIT_FAILURE);
-  */
 
   internal::logging::initialize(argv[0], flags, true); // Catch signals.
 
@@ -617,20 +578,6 @@ int main(int argc, char** argv)
   foreach (const flags::Warning& warning, load->warnings) {
     LOG(WARNING) << warning.message;
   }
-
-  /*
-  if (frameworkTypeString.get().compare("common") == 0)
-    frameworkType = FrameworkType::COMMON;
-  else if (frameworkTypeString.get().compare("low") == 0)
-    frameworkType = FrameworkType::LOW;
-  else {
-    cerr << "value for --framework_type unrecognized" << endl;
-    usage(argv[0], flags);
-    exit(EXIT_FAILURE);
-  }
-
-  LOG(INFO) << "Framework type selected: " << frameworkType;
-  */
 
   if (statsFilepath.isSome()) {
     if (remove(statsFilepath.get().c_str()) == 0 )
