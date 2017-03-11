@@ -113,57 +113,8 @@ static const double CPUS_PER_EXECUTOR = 0.1;
 static const int32_t MEM_PER_EXECUTOR = 32;
 
 std::mt19937 tasksInterarrivalTimeGenerator;
-// std::default_random_engine taskDurationGenerator;
-
-// Interarrival time distributions
-/*std::lognormal_distribution<double>
-  tasksInterarrivalTimeLogNormDistribution60(4.064, 0.25);
-*/
 std::exponential_distribution<double>
   tasksInterarrivalTimeExpDistribution_A;
-
-// Task duration distributions
-/*std::lognormal_distribution<double>
-  taskDurationLogNormDistribution60(4.064, 0.25);
-std::exponential_distribution<double> taskDurationExpDistribution05(0.5);
-*/
-
-// Interarrival time generators
-
-// Get the task interarrival time from an lognormal distribution
-// with m=4.064,s=0.25.
-// The mean value is about 60.
-// Return values in [0, +inf).
-/*uint64_t generateLognormalTasksInterarrivalTime60()
-{
-  uint64_t value =
-      static_cast<uint64_t>(tasksInterarrivalTimeLogNormDistribution60(
-          tasksInterarrivalTimeGenerator));
-
-  return value * 60;
-}
-*/
-
-// Task duration generators
-
-// Get the task duration from an lognormal distribution with m=4.064,s=0.25.
-// The mean value is about 60.
-// Return values in [0, +inf).
-/*uint64_t generateLognormalTasksDuration60()
-{
-  return static_cast<uint64_t>
-    (taskDurationLogNormDistribution60(taskDurationGenerator));
-}*/
-
-// Get the task duration from an exponential distribution with u=0.5.
-// Return values in [shift, +inf).
-/*uint64_t generateExpTasksDuration05(uint64_t shift)
-{
-  double value = taskDurationExpDistribution05(taskDurationGenerator);
-    return static_cast<uint64_t>(value + shift);
-}*/
-
-// Generate functions
 
 // Generate interarrival time (nanosecs)
 Duration getNextTaskInterarrivalTime()
@@ -172,16 +123,6 @@ Duration getNextTaskInterarrivalTime()
   CHECK_SOME(time);
   return time.get();
 }
-
-/*uint64_t getTaskDuration()
-{
-  if (frameworkType == FrameworkType::COMMON)
-    return generateLognormalTasksDuration60();
-  else if (frameworkType == FrameworkType::LOW)
-    return generateExpTasksDuration05(10);
-  else
-    exit(EXIT_FAILURE);
-}*/
 
 uint64_t getTaskDuration()
 {
@@ -193,7 +134,6 @@ uint64_t getTaskDuration()
     exit(EXIT_FAILURE);
 }
 
-///////
 
 uint64_t enqueueTask() {
   _lock.lock();
@@ -467,9 +407,7 @@ private:
   const bool implicitAcknowledgements;
   const ExecutorInfo executor;
   string role;
-  // int tasksLaunched;
   int tasksFinished;
-  // int totalTasks;
   int waitingTasksNumber;
 
   bool allocatable(
