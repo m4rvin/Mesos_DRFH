@@ -15,11 +15,11 @@ echo "LAUNCHING FRAMEWORKS"
 
 cd $MESOS_FRAMEWORK_EXECUTABLES_PATH
 
-time ./test-framework-drfh --master=127.0.0.1:5050 --framework_type=low --task_cpus_demand=1 --task_memory_demand=128MB --duration=60 --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework1" --interarrivals_distribution="E,1.8" &
+time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=128MB --duration=60 --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework1" --interarrivals_distribution="E,1.8" &
 pid=$!
 echo $pid
 
-time ./test-framework-drfh --master=127.0.0.1:5050 --framework_type=low --task_cpus_demand=4 --task_memory_demand=128MB --duration=60 --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework2" --interarrivals_distribution="E,0.4" &
+time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=128MB --duration=60 --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework2" --interarrivals_distribution="E,0.4" &
 pid=$!
 echo $pid
 

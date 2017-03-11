@@ -107,6 +107,8 @@ FrameworkType frameworkType;
 
 double cpusTaskDemand;
 Bytes memTaskDemand;
+uint64_t taskDuration;
+
 Resources TASK_RESOURCES;
 Option<string> statsFilepath;
 
@@ -127,14 +129,7 @@ Duration getNextTaskInterarrivalTime()
 
 uint64_t getTaskDuration()
 {
-  /*
-  if (frameworkType == FrameworkType::COMMON)
-    return generateLognormalTasksDuration60();
-  else if (frameworkType == FrameworkType::LOW)
-  */
-    return 10; // secs
-  // else
-    // exit(EXIT_FAILURE);
+  return taskDuration; // secs
 }
 
 
@@ -529,6 +524,21 @@ int main(int argc, char** argv)
            return None();
          });
 
+  flags.add(&taskDuration,
+         "task_duration",
+         None(),
+         "How much time to execute each task of the framework.\n"
+         "Please specify the number of seconds.",
+         static_cast<const uint64_t*>(nullptr),
+         [](const uint64_t& value) -> Option<Error> {
+           if (value <= 0) {
+             return Error(
+                 "Please use a --task_duration greater than " +
+                 stringify(0));
+           }
+           return None();
+         });
+
   double _frameworkDuration;
   flags.add(&_frameworkDuration,
          "duration",
@@ -636,6 +646,9 @@ int main(int argc, char** argv)
   frameworkDuration =  std::chrono::duration<double>(_frameworkDuration);
   LOG(INFO) << "Task duration for this framework will be: "
               << frameworkDuration.count() << " seconds.";
+
+  LOG(INFO) << "Task duration for this framework's tasks will be: "
+              << taskDuration << " seconds.";
 
   std::seed_seq seed(
       generators_seed.get().begin(),
