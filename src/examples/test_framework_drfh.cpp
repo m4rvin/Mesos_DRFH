@@ -64,14 +64,33 @@ using std::list;
 
 using mesos::Resources;
 
+// Start time of the framework
 std::chrono::steady_clock::time_point start;
+// ---
+
+// Framework's duration
 std::chrono::duration<double> frameworkDuration;
+// ---
+
+// Framework's pseudorandom behaviour
+std::mt19937 tasksInterarrivalTimeGenerator;
+std::exponential_distribution<double> tasksInterarrivalTimeExpDistribution_A;
 std::function<double()> generateTaskInterarrivalTime;
+// ---
 
-std::mutex _lock;
-uint64_t queuedTasksNumber = 0;
+// Framework's tasks configuration
+double cpusTaskDemand;
+Bytes memTaskDemand;
+uint64_t taskDuration;
+Resources TASK_RESOURCES;
+static const double CPUS_PER_EXECUTOR = 0.1;
+static const int32_t MEM_PER_EXECUTOR = 32;
+// ---
 
-int receivedOffers = 0;
+// Log files and stats variables
+Option<string> statsFilepath;
+
+uint64_t allocationRunNumber = 0;
 
 uint64_t totalTasksLaunched = 0;
 uint64_t totalTasksNotLaunched = 0;
@@ -80,26 +99,20 @@ uint64_t totalOffersAccepted = 0;
 uint64_t totalOffersUnused = 0;
 uint64_t totalOffersReceived = 0;
 
-uint64_t allocationRunNumber = 0;
 uint64_t tasksLaunched = 0;
 uint64_t tasksNotLaunched = 0;
+
+uint64_t receivedOffers = 0;
 uint64_t offersDeclined = 0;
 uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
+// ---
 
-double cpusTaskDemand;
-Bytes memTaskDemand;
-uint64_t taskDuration;
+// mutex and thread-safe variable
+std::mutex _lock;
+uint64_t queuedTasksNumber = 0;
+// ---
 
-Resources TASK_RESOURCES;
-Option<string> statsFilepath;
-
-static const double CPUS_PER_EXECUTOR = 0.1;
-static const int32_t MEM_PER_EXECUTOR = 32;
-
-std::mt19937 tasksInterarrivalTimeGenerator;
-std::exponential_distribution<double>
-  tasksInterarrivalTimeExpDistribution_A;
 
 // Generate interarrival time (nanosecs)
 Duration getNextTaskInterarrivalTime()
@@ -210,6 +223,17 @@ bool checkStoppableFramework() {
   if (elapsed.count() >= frameworkDuration.count())
      return true;
   return false;
+}
+
+void run()
+{
+  while (true) {
+    LOG(INFO) << "New task queued="   << enqueueTask();
+    LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
+    Duration arrivalTimeDelay = getNextTaskInterarrivalTime();
+    LOG(INFO) << "The next arrival will be in " << arrivalTimeDelay;
+    os::sleep(arrivalTimeDelay);
+  }
 }
 
 class TestScheduler : public Scheduler
@@ -406,18 +430,6 @@ void usage(const char* argv0, const flags::FlagsBase& flags)
        << flags.usage();
 }
 
-
-void run()
-{
-  while (true) {
-    LOG(INFO) << "New task queued="   << enqueueTask();
-    LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
-    Duration arrivalTimeDelay = getNextTaskInterarrivalTime();
-    LOG(INFO) << "The next arrival will be in " << arrivalTimeDelay;
-    os::sleep(arrivalTimeDelay);
-  }
-}
-
 void setupDistributions(const string& configuration)
 {
   vector<string> tokens = strings::split(configuration, ",");
@@ -443,7 +455,6 @@ void setupDistributions(const string& configuration)
       return;
     }
   }
-
   LOG(ERROR) << "Wrong format for the distribution configuration.";
   exit(EXIT_FAILURE);
 }
