@@ -66,6 +66,7 @@ using mesos::Resources;
 
 std::chrono::steady_clock::time_point start;
 std::chrono::duration<double> frameworkDuration;
+std::function<double()> generateTaskInterarrivalTime;
 
 std::mutex _lock;
 uint64_t queuedTasksNumber = 0;
@@ -143,16 +144,6 @@ std::exponential_distribution<double> taskDurationExpDistribution05(0.5);
 }
 */
 
-// Get a tasks interarrival time from an exponential distribution of type A.
-// Return values in [0, +inf). Unit size: nanosecs.
-Duration generateExponentialTasksInterarrivalTime_A()
-{
-  Try<Duration> time = Duration::create(
-      (tasksInterarrivalTimeExpDistribution_A(tasksInterarrivalTimeGenerator)));
-  CHECK_SOME(time);
-  return time.get(); // nanosecs
-}
-
 // Task duration generators
 
 // Get the task duration from an lognormal distribution with m=4.064,s=0.25.
@@ -175,14 +166,11 @@ Duration generateExponentialTasksInterarrivalTime_A()
 // Generate functions
 
 // Generate interarrival time (nanosecs)
-Duration generateTasksInterarrivalTime()
+Duration getNextTaskInterarrivalTime()
 {
-  /*if (frameworkType == FrameworkType::COMMON)
-    return generateLognormalTasksInterarrivalTime60();
-  else*/ if (frameworkType == FrameworkType::LOW)
-    return generateExponentialTasksInterarrivalTime_A();
-  else
-    exit(EXIT_FAILURE);
+  Try<Duration> time = Duration::create(generateTaskInterarrivalTime());
+  CHECK_SOME(time);
+  return time.get();
 }
 
 /*uint64_t getTaskDuration()
@@ -510,7 +498,7 @@ void run()
   while (true) {
     LOG(INFO) << "New task queued="   << enqueueTask();
     LOG(INFO) << "Total tasks queued=" << getQueuedTasks();
-    Duration arrivalTimeDelay = generateTasksInterarrivalTime();
+    Duration arrivalTimeDelay = getNextTaskInterarrivalTime();
     LOG(INFO) << "The next arrival will be in " << arrivalTimeDelay;
     os::sleep(arrivalTimeDelay);
   }
@@ -533,6 +521,11 @@ void setupDistributions(const string& configuration)
                 << lambda << " => E[X]=" << 1/lambda;
       tasksInterarrivalTimeExpDistribution_A =
           std::exponential_distribution<double>(lambda);
+
+      generateTaskInterarrivalTime =
+          std::bind(
+              tasksInterarrivalTimeExpDistribution_A,
+              tasksInterarrivalTimeGenerator);
       return;
     }
   }
