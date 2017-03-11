@@ -106,7 +106,6 @@ FrameworkType frameworkType;
 double cpusTaskDemand;
 Bytes memTaskDemand;
 Resources TASK_RESOURCES;
-uint64_t maxOffersReceivable;
 Option<string> statsFilepath;
 
 static const double CPUS_PER_EXECUTOR = 0.1;
@@ -297,6 +296,9 @@ bool checkStoppableFramework() {
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   std::chrono::duration<double> elapsed = end-start;
 
+  LOG(INFO) << "elapses secs=" << elapsed.count();
+  LOG(INFO) << "framework duration secs=" << frameworkDuration.count();
+
   if (elapsed.count() >= frameworkDuration.count())
      return true;
   return false;
@@ -342,10 +344,6 @@ public:
     foreach (const Offer& offer, offers) {
       receivedOffers++;
       totalOffersReceived++;
-
-      if (totalOffersReceived > maxOffersReceivable) {
-        driver->stop();
-      }
 
       LOG(INFO) << "Received offer "
                 << offer.id() << " with "
@@ -597,17 +595,18 @@ int main(int argc, char** argv)
            return None();
          });
 
-  flags.add(&maxOffersReceivable,
-         "offers_limit",
+  double _frameworkDuration;
+  flags.add(&_frameworkDuration,
+         "duration",
          None(),
-         "How many offers to process before asking to stop the driver and "
-         "close the framework.",
-         static_cast<const int*>(nullptr),
-         [](const int& value) -> Option<Error> {
+         "How much time to execute the framework."
+         " Please specify the number of seconds.",
+         static_cast<const double*>(nullptr),
+         [](const double& value) -> Option<Error> {
            if (value <= 0) {
              return Error(
-                 "Please use a --offers_limit greater than " +
-                 stringify(0));
+                 "Please use a --duration greater than " +
+                 stringify(1.0));
            }
            return None();
          });
@@ -695,12 +694,17 @@ int main(int argc, char** argv)
 
   LOG(INFO) << "Task resources for this framework will be: " << TASK_RESOURCES;
 
+  frameworkDuration =  std::chrono::duration<double>(_frameworkDuration);
+  LOG(INFO) << "Task duration for this framework will be: "
+              << frameworkDuration.count() << " seconds.";
+
   std::seed_seq seed(
       generators_seed.get().begin(),
       generators_seed.get().end());
   tasksInterarrivalTimeGenerator = std::mt19937(seed);
 
   setupDistributions(interarrivals_distribution.get());
+
 
   ExecutorInfo executor;
   executor.mutable_executor_id()->set_value("default");
@@ -773,7 +777,6 @@ int main(int argc, char** argv)
   thread.detach();
 
   start = std::chrono::steady_clock::now();
-  frameworkDuration =  std::chrono::duration<double>(10);
 
   int status = driver->run() == DRIVER_STOPPED ? 0 : 1;
 
