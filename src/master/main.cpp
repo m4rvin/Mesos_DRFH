@@ -76,6 +76,7 @@
 
 #include "version/version.hpp"
 
+
 using namespace mesos::internal;
 using namespace mesos::internal::log;
 using namespace mesos::internal::master;
@@ -208,6 +209,17 @@ int main(int argc, char** argv)
          "NB: if not specified no stats will be printed on file."
          );
 
+  Option<string> slaveSelectionHeuristic;
+  flags.add(&slaveSelectionHeuristic,
+         "slave_selection_heuristic",
+         "The heuristic to use to select which is the next slave to offer "
+         "to a framework.\n"
+         "Choose among:"
+         "  random\n"
+         "  maxServer\n"
+         "  balancedResources\n"
+         );
+
   Try<flags::Warnings> load = flags.load("MESOS_", argc, argv);
 
   if (flags.help) {
@@ -270,6 +282,14 @@ int main(int argc, char** argv)
   if(clusterStatsFilepath.isSome()) {
     os::setenv("CLUSTER_STATS_FILE", clusterStatsFilepath.get());
   }
+
+  if(slaveSelectionHeuristic.isNone()) {
+    cerr << "Missing --slave_selection_heuristic" << endl;
+    cout << flags.usage();
+    exit(EXIT_FAILURE);
+  }
+  os::setenv("SLAVE_SELECTION_HEURISTIC", slaveSelectionHeuristic.get());
+
 
   // Log build information.
   LOG(INFO) << "Build: " << build::DATE << " by " << build::USER;

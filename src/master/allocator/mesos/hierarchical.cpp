@@ -57,6 +57,11 @@ using process::Timeout;
 
 int blind_policy_log_level = -1;
 
+const std::string RANDOM_HEURISTIC = "random";
+const std::string MAX_SERVER_HEURISTIC = "maxServer";
+const std::string BALANCED_RESOURCES_HEURISTIC = "balancedResources";
+
+
 namespace mesos {
 namespace internal {
 namespace master {
@@ -352,6 +357,8 @@ Option<tuple<SlaveID, Resources>>
   HierarchicalAllocatorProcess::randomServerHeuristic
   (hashmap<SlaveID, Resources>& slaves)
 {
+  LOG(INFO) << "STARTING randomHeuristic";
+
   vector<tuple<SlaveID, Resources>> slavesVect (slaves.begin(), slaves.end());
   std::random_shuffle(slavesVect.begin(), slavesVect.end());
 
@@ -1879,9 +1886,22 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
   if (slaves.size() == 1)
       return tuple<SlaveID, Resources>(slaves.begin()->
                                        first, slaves.begin()->second);
-  // return randomServerHeuristic(slaves);
-  // return maxResourcesHeuristic(slaves);
-  return balancedResourcesHeuristic(slaves);
+  Option<string> slaveSelectionHeuristic =
+      os::getenv("SLAVE_SELECTION_HEURISTIC");
+  CHECK_SOME(slaveSelectionHeuristic);
+
+  string heuristic = slaveSelectionHeuristic.get();
+
+  if (heuristic.compare("maxServer") == 0)
+    return maxResourcesHeuristic(slaves);
+  else if (heuristic.compare("balancedResources") == 0)
+    return balancedResourcesHeuristic(slaves);
+  else if (heuristic.compare("random") == 0)
+      return randomServerHeuristic(slaves);
+  LOG(FATAL) << endl << endl
+             << "No correct heuristic name has been specified." << endl
+             << "Check the commandline!" << endl
+             << "Aborting the execution." << endl << endl;
 }
 
 void HierarchicalAllocatorProcess::allocateToFrameworks(
