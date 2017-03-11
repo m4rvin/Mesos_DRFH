@@ -88,6 +88,7 @@ uint64_t offersDeclined = 0;
 uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
 
+/*
 enum class FrameworkType { COMMON, LOW};
 
 std::ostream& operator<<(std::ostream& os, FrameworkType f)
@@ -101,8 +102,8 @@ std::ostream& operator<<(std::ostream& os, FrameworkType f)
     return os;
 }
 
-
 FrameworkType frameworkType;
+*/
 
 double cpusTaskDemand;
 Bytes memTaskDemand;
@@ -126,12 +127,14 @@ Duration getNextTaskInterarrivalTime()
 
 uint64_t getTaskDuration()
 {
-  /*if (frameworkType == FrameworkType::COMMON)
+  /*
+  if (frameworkType == FrameworkType::COMMON)
     return generateLognormalTasksDuration60();
-  else*/ if (frameworkType == FrameworkType::LOW)
-    return 10; //secs
-  else
-    exit(EXIT_FAILURE);
+  else if (frameworkType == FrameworkType::LOW)
+  */
+    return 10; // secs
+  // else
+    // exit(EXIT_FAILURE);
 }
 
 
@@ -192,7 +195,7 @@ void printStats()
             << "Offers received= "           << receivedOffers           << endl
             << "Offers declined = "          << offersDeclined           << endl
             << "Offers accepted = "          << offersAccepted           << endl
-            << "Offers unused = "            << offersUnused ;
+            << "Offers unused = "            << offersUnused;
 }
 
 void printOnFile() {
@@ -548,6 +551,7 @@ int main(int argc, char** argv)
          "write stats. NB: if not specified no stats will be printed on file."
          );
 
+  /*
   Option<string> frameworkTypeString;
   flags.add(&frameworkTypeString,
            "framework_type",
@@ -556,6 +560,7 @@ int main(int argc, char** argv)
            "Each type has its own distributions.\n"
            "Options are: common, low."
            );
+   */
 
   Option<string> generators_seed;
   flags.add(&generators_seed,
@@ -580,10 +585,6 @@ int main(int argc, char** argv)
     cerr << "Missing --master" << endl;
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
-  } else if (frameworkTypeString.isNone()) {
-    cerr << "Missing --framework_type" << endl;
-    usage(argv[0], flags);
-    exit(EXIT_FAILURE);
   } else if (generators_seed.isNone()) {
     cerr << "Missing --generators_seed" << endl;
     usage(argv[0], flags);
@@ -593,6 +594,12 @@ int main(int argc, char** argv)
     usage(argv[0], flags);
     exit(EXIT_FAILURE);
   }
+  /*
+   } else if (frameworkTypeString.isNone()) {
+    cerr << "Missing --framework_type" << endl;
+    usage(argv[0], flags);
+    exit(EXIT_FAILURE);
+  */
 
   internal::logging::initialize(argv[0], flags, true); // Catch signals.
 
@@ -601,6 +608,7 @@ int main(int argc, char** argv)
     LOG(WARNING) << warning.message;
   }
 
+  /*
   if (frameworkTypeString.get().compare("common") == 0)
     frameworkType = FrameworkType::COMMON;
   else if (frameworkTypeString.get().compare("low") == 0)
@@ -612,7 +620,7 @@ int main(int argc, char** argv)
   }
 
   LOG(INFO) << "Framework type selected: " << frameworkType;
-
+  */
 
   if (statsFilepath.isSome()) {
     if (remove(statsFilepath.get().c_str()) == 0 )
