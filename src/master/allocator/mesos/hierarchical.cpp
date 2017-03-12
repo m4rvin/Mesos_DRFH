@@ -1892,11 +1892,11 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
 
   string heuristic = slaveSelectionHeuristic.get();
 
-  if (heuristic.compare("maxServer") == 0)
+  if (heuristic.compare(MAX_SERVER_HEURISTIC) == 0)
     return maxResourcesHeuristic(slaves);
-  else if (heuristic.compare("balancedResources") == 0)
+  else if (heuristic.compare(BALANCED_RESOURCES_HEURISTIC) == 0)
     return balancedResourcesHeuristic(slaves);
-  else if (heuristic.compare("random") == 0)
+  else if (heuristic.compare(RANDOM_HEURISTIC) == 0)
       return randomServerHeuristic(slaves);
   LOG(FATAL) << endl << endl
              << "No correct heuristic name has been specified." << endl
