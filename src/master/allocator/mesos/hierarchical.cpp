@@ -58,7 +58,7 @@ using process::Timeout;
 int blind_policy_log_level = -1;
 
 const std::string RANDOM_HEURISTIC = "random";
-const std::string MAX_SERVER_HEURISTIC = "maxServer";
+const std::string MAX_SERVER_LIKE_HEURISTIC = "maxServerLike";
 const std::string BALANCED_RESOURCES_HEURISTIC = "balancedResources";
 
 
@@ -374,10 +374,10 @@ Option<tuple<SlaveID, Resources>>
 
 
 Option<tuple<SlaveID, Resources>>
-  HierarchicalAllocatorProcess::maxResourcesHeuristic
+  HierarchicalAllocatorProcess::maxServerLikeHeuristic
   (hashmap<SlaveID, Resources>& slaves)
 {
-  LOG(INFO) << "STARTING maxResourceHeuristic";
+  LOG(INFO) << "STARTING maxServerLikeHeuristic";
 
   // Compare to be used in std::sort based on cpus.
   // Return true if first should go before than second. False otherwise.
@@ -1892,8 +1892,8 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
 
   string heuristic = slaveSelectionHeuristic.get();
 
-  if (heuristic.compare(MAX_SERVER_HEURISTIC) == 0)
-    return maxResourcesHeuristic(slaves);
+  if (heuristic.compare(MAX_SERVER_LIKE_HEURISTIC) == 0)
+    return maxServerLikeHeuristic(slaves);
   else if (heuristic.compare(BALANCED_RESOURCES_HEURISTIC) == 0)
     return balancedResourcesHeuristic(slaves);
   else if (heuristic.compare(RANDOM_HEURISTIC) == 0)

@@ -228,8 +228,10 @@ protected:
   Option<std::tuple<SlaveID, Resources>>
     balancedResourcesHeuristic(hashmap<SlaveID, Resources>& slaves);
 
-  // Heuristic to get the slave with the highest Resources.
-  Option<std::tuple<SlaveID, Resources>> maxResourcesHeuristic
+  // Heuristic to get the slave with the resources most similar to a
+  // hypothetical server containing the highest Resources between all servers
+  // in the cluster.
+  Option<std::tuple<SlaveID, Resources>> maxServerLikeHeuristic
     (hashmap<SlaveID, Resources>& slaves);
 
   // Heuristic to get the slave randomly from the slaves' list.

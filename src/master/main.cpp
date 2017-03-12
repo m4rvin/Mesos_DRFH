@@ -216,7 +216,7 @@ int main(int argc, char** argv)
          "to a framework.\n"
          "Choose among:"
          "  random\n"
-         "  maxServer\n"
+         "  maxServerLike\n"
          "  balancedResources\n"
          );
 
