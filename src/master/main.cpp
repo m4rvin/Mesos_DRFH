@@ -217,6 +217,7 @@ int main(int argc, char** argv)
          "Choose among:"
          "  random\n"
          "  maxServerLike\n"
+         "  maxAvailableServer\n"
          "  balancedResources\n"
          );
 

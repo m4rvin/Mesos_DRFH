@@ -234,6 +234,11 @@ protected:
   Option<std::tuple<SlaveID, Resources>> maxServerLikeHeuristic
     (hashmap<SlaveID, Resources>& slaves);
 
+  // Heuristic to get the slave with the highest resources available (using
+  // the realAllocated field of Slave).
+  Option<std::tuple<SlaveID, Resources>> maxAvailableServerHeuristic
+    (hashmap<SlaveID, Resources>& slaves);
+
   // Heuristic to get the slave randomly from the slaves' list.
   Option<std::tuple<SlaveID, Resources>> randomServerHeuristic
     (hashmap<SlaveID, Resources>& slaves);
