@@ -462,7 +462,7 @@ Option<tuple<SlaveID, Resources>>
     // If the above does not return then the vectors contain different element
     // but this is not possible, so exit with failure and check the sourcecode.
     // TODO(danang) is it necessary?
-    exit(EXIT_FAILURE);
+    EXIT(EXIT_FAILURE);
   };
 
   // Slaves to be sorted in ascending order by CPU
@@ -591,7 +591,7 @@ Option<tuple<SlaveID, Resources>>
     // If the above does not return then the vectors contain different element
     // but this is not possible, so exit with failure and check the sourcecode.
     // TODO(danang) is it necessary?
-    exit(EXIT_FAILURE);
+    EXIT(EXIT_FAILURE);
   };
 
   hashset<SlaveID> slaveIds = slaves.keys();
