@@ -61,6 +61,8 @@ const std::string RANDOM_HEURISTIC = "random";
 const std::string MAX_SERVER_LIKE_HEURISTIC = "maxServerLike";
 const std::string MAX_AVAILABLE_SERVER_HEURISTIC = "maxAvailableServer";
 const std::string BALANCED_RESOURCES_HEURISTIC = "balancedResources";
+const std::string FIRST_FIT_DRFH_HEURISTIC = "firstFitDRFH";
+
 
 
 namespace mesos {
@@ -371,6 +373,82 @@ Option<tuple<SlaveID, Resources>>
   Option<tuple<SlaveID, Resources>> selectedSlave = Some(*it);
   slaves.erase(std::get<0>(*it));
   return selectedSlave;
+}
+
+Option<std::tuple<SlaveID, Resources>>
+  HierarchicalAllocatorProcess::firstFitDrfhHeuristic (
+      hashmap<SlaveID, Resources>& slaves,
+      const FrameworkID& frameworkId)
+{
+  LOG(INFO) << "STARTING firstFitDrfhHeuristic";
+
+  // Return true if the _meanFrameworkDemand fits into the slave's resources
+  // The fitting is possible only if both cpu and mem demands are smaller than
+  // the slave's resources.
+  auto checkFrameworkFitting =
+      [] (
+          const Resources& _meanFrameworkDemand,
+          const Resources& _availableSlaveResources) {
+    // No way to fit _meanFrameworkDemand because the slave has no available
+    // resources left.
+    if (_availableSlaveResources.empty())
+      return false;
+
+    double _availableSlaveCpus = 0.0;
+    Bytes _availableSlaveMem;
+    if (_availableSlaveResources.cpus().isSome())
+      _availableSlaveCpus = _availableSlaveResources.cpus().get();
+    if (_availableSlaveResources.mem().isSome())
+      _availableSlaveMem = _availableSlaveResources.mem().get();
+
+    // The current framework has not received an allocation yet, so no mean
+    // value has been computed. Whichever slave selected is ok.
+    if (_meanFrameworkDemand.cpus().isNone() ||
+        _meanFrameworkDemand.mem().isNone())
+      return true;
+
+    if (_meanFrameworkDemand.cpus().get() <= _availableSlaveCpus &&
+        _meanFrameworkDemand.mem().get() <= _availableSlaveMem)
+      return true;
+
+    return false;
+  };
+
+  vector<tuple<SlaveID, Resources>> slavesVect (slaves.begin(), slaves.end());
+  std::random_shuffle(slavesVect.begin(), slavesVect.end());
+
+  Resources meanFrameworkDemand = frameworks[frameworkId].meanFrameworkDemand;
+
+  Option<SlaveID> selectedSlaveId = None();
+  foreach (auto const& it, slavesVect) {
+    SlaveID slaveId = std::get<0>(it);
+    Resources allocatedSlaveResources = this->slaves[slaveId].realAllocated;
+    Resources totalSlaveResources = this->slaves[slaveId].total;
+
+    Resources availableSlaveResources =
+        totalSlaveResources - allocatedSlaveResources;
+
+    if (checkFrameworkFitting(meanFrameworkDemand, availableSlaveResources)) {
+      selectedSlaveId = slaveId;
+      LOG(INFO) << "firstFitDrfhHeuristic chose slave: "
+                << selectedSlaveId.get() << " with available resources "
+                << availableSlaveResources;
+      break;
+    }
+  }
+
+  // No slave matched the framework's demand.
+  if (selectedSlaveId.isNone())
+    return None();
+
+  Option<std::tuple<SlaveID, Resources>> selected =
+      std::make_tuple(
+          selectedSlaveId.get(),
+          slaves.get(selectedSlaveId.get()).get());
+  CHECK(slaves.erase(selectedSlaveId.get()) == 1);
+
+
+  return selected;
 }
 
 
@@ -1234,6 +1312,14 @@ void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
     const FrameworkID& frameworkId,
     const Resources& demand)
 {
+  Option<string> slaveSelectionHeuristic =
+      os::getenv("SLAVE_SELECTION_HEURISTIC");
+  CHECK_SOME(slaveSelectionHeuristic);
+  // No need to update the mean framework demand if not using an heuristic
+  // which need this information.
+  if (slaveSelectionHeuristic.get().compare(FIRST_FIT_DRFH_HEURISTIC) != 0)
+    return;
+
   // Return a Resources containing the mean framework demand computed from the
   // arguments per each resource type.
   auto getMeanFrameworkDemand = [] (
@@ -2034,7 +2120,9 @@ void HierarchicalAllocatorProcess::allocate(
 }
 
 Option<tuple<SlaveID, Resources>>
-HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
+HierarchicalAllocatorProcess::pickOutSlave(
+    hashmap<SlaveID, Resources>& slaves,
+    const FrameworkID& frameworkId)
 {
 /*
   // Pick the slave randomly.
@@ -2080,6 +2168,8 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
     return maxAvailableServerHeuristic(slaves);
   else if (heuristic.compare(BALANCED_RESOURCES_HEURISTIC) == 0)
     return balancedResourcesHeuristic(slaves);
+  else if (heuristic.compare(FIRST_FIT_DRFH_HEURISTIC) == 0)
+    return firstFitDrfhHeuristic(slaves, frameworkId);
   else if (heuristic.compare(RANDOM_HEURISTIC) == 0)
       return randomServerHeuristic(slaves);
   LOG(FATAL) << endl << endl
@@ -2196,7 +2286,7 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
 
     while(!acceptableOffer)
     {
-      selectedSlave = pickOutSlave(candidateSlavesResources);
+      selectedSlave = pickOutSlave(candidateSlavesResources, frameworkId);
       if (selectedSlave.isNone())
         break;
 

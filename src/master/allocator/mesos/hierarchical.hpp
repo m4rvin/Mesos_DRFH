@@ -247,6 +247,11 @@ protected:
   Option<std::tuple<SlaveID, Resources>> randomServerHeuristic
     (hashmap<SlaveID, Resources>& slaves);
 
+  // Heuristic to get the slave with the first-fit DRFH approach
+  // from the slaves' list.
+  Option<std::tuple<SlaveID, Resources>> firstFitDrfhHeuristic
+    (hashmap<SlaveID, Resources>& slaves,  const FrameworkID& frameworkId);
+
   // Idempotent helpers for pausing and resuming allocation.
   void pause();
   void resume();
@@ -274,7 +279,8 @@ protected:
   // removing it from that list.
   // If no slaves could be picked out, return None.
   Option<std::tuple<SlaveID, Resources>> pickOutSlave(
-      hashmap<SlaveID, Resources>& slaves);
+      hashmap<SlaveID, Resources>& slaves,
+      const FrameworkID& frameworkId);
 
   // Remove an offer filter for the specified framework.
   void expire(
