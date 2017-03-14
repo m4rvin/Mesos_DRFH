@@ -2086,6 +2086,8 @@ HierarchicalAllocatorProcess::pickOutSlave(hashmap<SlaveID, Resources>& slaves)
              << "No correct heuristic name has been specified." << endl
              << "Check the commandline!" << endl
              << "Aborting the execution." << endl << endl;
+
+  EXIT(EXIT_FAILURE);
 }
 
 void HierarchicalAllocatorProcess::allocateToFrameworks(
