@@ -3768,6 +3768,12 @@ void Master::_accept(
   // tasks when they get launched.
   Resources _consumedResources;
 
+  /*
+  // We keep track of the number of tasks launched (i.e. the ones with
+  // operation LAUNCH).
+  uint64_t _tasksLaunched = 0;
+  */
+
   // We keep track of the shared resources from the offers separately.
   // `offeredSharedResources` can be modified by CREATE/DESTROY but we
   // don't remove from it when a task is successfully launched so this
@@ -4189,6 +4195,7 @@ void Master::_accept(
 
             _offeredResources -= consumed;
             _consumedResources += consumed;
+            // _tasksLaunched++;
 
             // TODO(bmahler): Consider updating this log message to
             // indicate when the executor is also being launched.
@@ -4428,10 +4435,77 @@ void Master::_accept(
             << " => " << _consumedResources
             << " over offered => " << offeredResources;
 
-  if (!_consumedResources.empty())
-    allocator->allocateActualResources(
-            slaveId,
-            _consumedResources);
+  if (!_consumedResources.empty()) {
+    allocator->allocateActualResources(slaveId, _consumedResources);
+    allocator->updateMeanFrameworkDemand(frameworkId, _consumedResources);
+  }
+
+
+  /*
+  // Return a Resources containing the mean task demand computed from the
+  // arguments per each resoruce type.
+  auto getMeanTaskDemand = [] (
+      const Resources& __consumedResources,
+      const uint64_t& __tasksLaunched) {
+    double __meanTaskCpusDemand = 0.0;
+    uint64_t __meanTaskMemDemandMB = 0;
+    // launched tasks cpu > 0
+    if (__consumedResources.cpus().isSome())
+      __meanTaskCpusDemand = __consumedResources.cpus().get()/__tasksLaunched;
+    if (__consumedResources.mem().isSome())
+      // Approximated mean task demand (NB: division by integer)
+      __meanTaskMemDemandMB =
+          __consumedResources.mem().get().megabytes()/__tasksLaunched;
+
+    Resources meanTaskDemand = Resources::parse(
+        "cpus:" + stringify(__meanTaskCpusDemand) +
+        ";mem:" + stringify(__meanTaskMemDemandMB)).get();
+    return meanTaskDemand;
+  };
+
+  // Return true if new tasks could have put in the _offeredResources, false
+  // otherwise. The task demand is computed as the mean demand over
+  // _consumedResources given the number of _launchedTasks.
+  // The fitting is possible if the cpu,mem demands are smaller than the
+  // remaining offered values.
+  auto checkTaskFitting =
+      [] (
+          const Resources& _meanTaskDemand,
+          const Resources& _remainingOfferedResources) {
+    // No way to fit other tasks because offered is not empty or because
+    // no tasks have been launched and it's not possible to estimate the mean
+    // task demand.
+    if (_remainingOfferedResources.empty())
+      return false;
+
+    double _remainingOfferedCpus = 0.0;
+    Bytes _remainingOfferedMem;
+    if (_remainingOfferedResources.cpus().isSome())
+      _remainingOfferedCpus = _remainingOfferedResources.cpus().get();
+    if (_remainingOfferedResources.mem().isSome())
+      _remainingOfferedMem = _remainingOfferedResources.mem().get();
+
+    if (_meanTaskDemand.cpus().get() <= _remainingOfferedCpus &&
+        _meanTaskDemand.mem().get() <= _remainingOfferedMem)
+      return true;
+
+    return false;
+  };
+
+
+  // Update mean demand for this framework.
+  if (!_consumedResources.empty()) {
+
+    Resources meanTaskDemand = getMeanTaskDemand(
+           _consumedResources,
+           _tasksLaunched);
+    CHECK_SOME(meanTaskDemand.cpus());
+    CHECK_SOME(meanTaskDemand.mem());
+
+    if (checkTaskFitting(meanTaskDemand, offeredResources))
+       allocator->updateMeanFrameworkDemand(frameworkId, meanTaskDemand);
+  }
+  */
 
   // NB: resources not yet used are tracked using deallocateActualResources()
   // Currently it has been set only for task termination

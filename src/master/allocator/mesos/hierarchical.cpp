@@ -1230,6 +1230,52 @@ void HierarchicalAllocatorProcess::requestResources(
   LOG(INFO) << "Received resource request from framework " << frameworkId;
 }
 
+void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
+    const FrameworkID& frameworkId,
+    const Resources& demand)
+{
+  // Return a Resources containing the mean framework demand computed from the
+  // arguments per each resource type.
+  auto getMeanFrameworkDemand = [] (
+     const Resources& _consumedResources,
+     const uint64_t& _totalOffersAccepted) {
+    double _meanFrameworkCpusDemand = 0.0;
+    uint64_t _meanFrameworkMemDemandMB = 0;
+    if (_consumedResources.cpus().isSome())
+     _meanFrameworkCpusDemand =
+         _consumedResources.cpus().get()/_totalOffersAccepted;
+    if (_consumedResources.mem().isSome())
+     // Approximated mean task demand (NB: division by integer)
+     _meanFrameworkMemDemandMB =
+         _consumedResources.mem().get().megabytes()/_totalOffersAccepted;
+
+    Resources meanTaskDemand = Resources::parse(
+       "cpus:" + stringify(_meanFrameworkCpusDemand) +
+       ";mem:" + stringify(_meanFrameworkMemDemandMB)).get();
+    return meanTaskDemand;
+  };
+
+  if(frameworks.get(frameworkId).isNone())
+    return;
+
+  // TODO(danang) Handle overflow of numerical variables (e.g. reset
+  // totalConsumed to the last mean value and totalOffersAccepted to 1).
+  frameworks[frameworkId].totalConsumed += demand;
+  frameworks[frameworkId].totalOffersAccepted++;
+
+  frameworks[frameworkId].meanFrameworkDemand = getMeanFrameworkDemand (
+      frameworks[frameworkId].totalConsumed,
+      frameworks[frameworkId].totalOffersAccepted);
+
+  LOG(INFO) << "Mean framework demand for framework " << frameworkId
+            << " updated to " << frameworks[frameworkId].meanFrameworkDemand;
+
+  LOG(INFO) << "Total resources consumed for framework " << frameworkId
+            << " updated to " << frameworks[frameworkId].totalConsumed;
+
+  LOG(INFO) << "Total offers accepted for framework " << frameworkId
+            << " updated to " << frameworks[frameworkId].totalOffersAccepted;
+}
 
 void HierarchicalAllocatorProcess::updateAllocation(
     const FrameworkID& frameworkId,

@@ -415,6 +415,13 @@ public:
   virtual void deallocateActualResources(
       const SlaveID& slaveId,
       const Resources& toDeallocate) {};
+
+  /**
+   * Update the mean demand for the tracked frameworks.
+   */
+  virtual void updateMeanFrameworkDemand(
+      const FrameworkID& frameworkId,
+      const Resources& demand) {};
 };
 
 } // namespace allocator {

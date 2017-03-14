@@ -217,6 +217,10 @@ public:
       const SlaveID& slaveId,
       const Resources& toDeallocate);
 
+  void updateMeanFrameworkDemand(
+      const FrameworkID& frameworkId,
+      const Resources& demand);
+
 
 protected:
   // Useful typedefs for dispatch/delay/defer to self()/this.
@@ -347,6 +351,12 @@ protected:
     // Active offer and inverse offer filters for the framework.
     hashmap<SlaveID, hashset<OfferFilter*>> offerFilters;
     hashmap<SlaveID, hashset<InverseOfferFilter*>> inverseOfferFilters;
+
+    Resources totalConsumed;
+
+    uint64_t totalOffersAccepted;
+
+    Resources meanFrameworkDemand;
   };
 
   double _event_queue_dispatches()
