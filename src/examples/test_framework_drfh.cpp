@@ -75,6 +75,8 @@ std::chrono::duration<double> frameworkDuration;
 // Framework's pseudorandom behaviour
 std::mt19937 tasksInterarrivalTimeGenerator;
 std::exponential_distribution<double> tasksInterarrivalTimeExpDistribution_A;
+std::lognormal_distribution<double> tasksInterarrivalTimeLogNormalDistribution;
+
 std::function<double()> generateTaskInterarrivalTime;
 // ---
 
@@ -440,6 +442,21 @@ void setupDistributions(const string& configuration)
       // TODO(danang) check the fields
       return;
     }
+    if(tokens[0].compare("LogNormal") == 0) {
+      double m = lexical_cast<double>(tokens[1]);
+      double s = lexical_cast<double>(tokens[2]);
+      LOG(INFO) << "Selected a LogNormal distribution with m="
+                << m << ", s=" << s << " as parameters of the underlying normal"
+                << "distribution.";
+      tasksInterarrivalTimeLogNormalDistribution =
+          std::lognormal_distribution<double> (m, s);
+
+      generateTaskInterarrivalTime =
+                std::bind(
+                    tasksInterarrivalTimeLogNormalDistribution,
+                    tasksInterarrivalTimeGenerator);
+      return;
+    }
   } else if(tokens.size() == 2) {
     if(tokens[0].compare("E") == 0) {
       double lambda = lexical_cast<double>(tokens[1]);
@@ -561,7 +578,9 @@ int main(int argc, char** argv)
             "distribution to use for the interarrival of tasks.\n"
             "   Examples:\n"
             "   E,lambda\n"
-            "   N,u,stddev");
+            "   N,u,stddev\n"
+            "   LogNormal,m,s "
+            "(mean and stddev of the underlying Normal distribution.)");
 
   Try<flags::Warnings> load = flags.load(None(), argc, argv);
 
