@@ -437,11 +437,6 @@ void setupDistributions(const string& configuration)
   vector<string> tokens = strings::split(configuration, ",");
 
   if (tokens.size() == 3) {
-    if(tokens[0].compare("N") == 0) {
-      LOG(INFO) << "Selected a Gamma distribution.";
-      // TODO(danang) check the fields
-      return;
-    }
     if(tokens[0].compare("LogNormal") == 0) {
       double m = lexical_cast<double>(tokens[1]);
       double s = lexical_cast<double>(tokens[2]);
@@ -578,7 +573,6 @@ int main(int argc, char** argv)
             "distribution to use for the interarrival of tasks.\n"
             "   Examples:\n"
             "   Exp,lambda\n"
-            "   N,u,stddev\n"
             "   LogNormal,m,s "
             "(mean and stddev of the underlying Normal distribution.)");
 
