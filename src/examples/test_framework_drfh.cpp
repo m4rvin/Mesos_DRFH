@@ -74,7 +74,7 @@ std::chrono::duration<double> frameworkDuration;
 
 // Framework's pseudorandom behaviour
 std::mt19937 tasksInterarrivalTimeGenerator;
-std::exponential_distribution<double> tasksInterarrivalTimeExpDistribution_A;
+std::exponential_distribution<double> tasksInterarrivalTimeExpDistribution;
 std::lognormal_distribution<double> tasksInterarrivalTimeLogNormalDistribution;
 
 std::function<double()> generateTaskInterarrivalTime;
@@ -458,16 +458,16 @@ void setupDistributions(const string& configuration)
       return;
     }
   } else if(tokens.size() == 2) {
-    if(tokens[0].compare("E") == 0) {
+    if(tokens[0].compare("Exp") == 0) {
       double lambda = lexical_cast<double>(tokens[1]);
       LOG(INFO) << "Selected an Exponential distribution with lambda="
                 << lambda << " => E[X]=" << 1/lambda;
-      tasksInterarrivalTimeExpDistribution_A =
+      tasksInterarrivalTimeExpDistribution =
           std::exponential_distribution<double>(lambda);
 
       generateTaskInterarrivalTime =
           std::bind(
-              tasksInterarrivalTimeExpDistribution_A,
+              tasksInterarrivalTimeExpDistribution,
               tasksInterarrivalTimeGenerator);
       return;
     }
@@ -577,7 +577,7 @@ int main(int argc, char** argv)
             "interarrivals_distribution",
             "distribution to use for the interarrival of tasks.\n"
             "   Examples:\n"
-            "   E,lambda\n"
+            "   Exp,lambda\n"
             "   N,u,stddev\n"
             "   LogNormal,m,s "
             "(mean and stddev of the underlying Normal distribution.)");
