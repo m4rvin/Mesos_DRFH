@@ -1276,6 +1276,9 @@ message Offer {
   // The unavailability may also be forever!  See comments in
   // `Unavailability` for more details.
   optional Unavailability unavailability = 9;
+  // Track the allocation run on the master in which this offer has been
+  // generated.
+  optional uint64 allocation_run = 10;
 
   // Defines an operation that can be performed against offers.
   message Operation {

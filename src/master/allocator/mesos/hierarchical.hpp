@@ -101,7 +101,8 @@ public:
       const Duration& allocationInterval,
       const lambda::function<
           void(const FrameworkID&,
-               const hashmap<SlaveID, Resources>&)>& offerCallback,
+               const hashmap<SlaveID, Resources>&,
+               const uint64_t&)>& offerCallback,
       const lambda::function<
           void(const FrameworkID&,
                const hashmap<SlaveID, UnavailableResources>&)>&
@@ -321,6 +322,8 @@ protected:
   bool initialized;
   bool paused;
 
+  uint64_t allocationRun;
+
   // Recovery data.
   Option<int> expectedAgentCount;
 
@@ -328,7 +331,8 @@ protected:
 
   lambda::function<
       void(const FrameworkID&,
-           const hashmap<SlaveID, Resources>&)> offerCallback;
+           const hashmap<SlaveID, Resources>&,
+           const uint64_t&)> offerCallback;
 
   lambda::function<
       void(const FrameworkID&,

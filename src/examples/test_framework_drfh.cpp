@@ -281,7 +281,8 @@ public:
 
       LOG(INFO) << "Received offer "
                 << offer.id() << " with "
-                << offer.resources();
+                << offer.resources() << " from allocation run#"
+                << offer.allocation_run();
 
       Resources remaining = offer.resources();
 

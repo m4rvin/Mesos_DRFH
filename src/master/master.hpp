@@ -538,7 +538,8 @@ public:
 
   void offer(
       const FrameworkID& framework,
-      const hashmap<SlaveID, Resources>& resources);
+      const hashmap<SlaveID, Resources>& resources,
+      const uint64_t& allocationRun);
 
   void inverseOffer(
       const FrameworkID& framework,

@@ -50,7 +50,8 @@ public:
       const Duration& allocationInterval,
       const lambda::function<
           void(const FrameworkID&,
-               const hashmap<SlaveID, Resources>&)>& offerCallback,
+               const hashmap<SlaveID, Resources>&,
+               const uint64_t&)>& offerCallback,
       const lambda::function<
           void(const FrameworkID&,
                const hashmap<SlaveID, UnavailableResources>&)>&
@@ -195,7 +196,8 @@ public:
       const Duration& allocationInterval,
       const lambda::function<
           void(const FrameworkID&,
-               const hashmap<SlaveID, Resources>&)>& offerCallback,
+               const hashmap<SlaveID, Resources>&,
+               const uint64_t&)>& offerCallback,
       const lambda::function<
           void(const FrameworkID&,
                const hashmap<SlaveID, UnavailableResources>&)>&
@@ -348,7 +350,8 @@ inline void MesosAllocator<AllocatorProcess>::initialize(
     const Duration& allocationInterval,
     const lambda::function<
         void(const FrameworkID&,
-             const hashmap<SlaveID, Resources>&)>& offerCallback,
+             const hashmap<SlaveID, Resources>&,
+             const uint64_t&)>& offerCallback,
     const lambda::function<
         void(const FrameworkID&,
               const hashmap<SlaveID, UnavailableResources>&)>&

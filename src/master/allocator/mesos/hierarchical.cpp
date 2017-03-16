@@ -819,7 +819,8 @@ void HierarchicalAllocatorProcess::initialize(
     const Duration& _allocationInterval,
     const lambda::function<
         void(const FrameworkID&,
-             const hashmap<SlaveID, Resources>&)>& _offerCallback,
+             const hashmap<SlaveID, Resources>&,
+             const uint64_t&)>& _offerCallback,
     const lambda::function<
         void(const FrameworkID&,
              const hashmap<SlaveID, UnavailableResources>&)>&
@@ -840,6 +841,8 @@ void HierarchicalAllocatorProcess::initialize(
   // necessary.
   roleSorter->initialize(fairnessExcludeResourceNames);
   quotaRoleSorter->initialize(fairnessExcludeResourceNames);
+
+  allocationRun = 0;
 
   VLOG(1) << "Initialized hierarchical allocator process";
 
@@ -2338,11 +2341,13 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
   } else {
     // Now offer the resources to each framework.
     foreachkey (const FrameworkID& frameworkId, offerable) {
-      offerCallback(frameworkId, offerable[frameworkId]);
+      offerCallback(frameworkId, offerable[frameworkId], allocationRun);
     }
   }
 
   deallocate(slaveIds_);
+
+  allocationRun++;
 }
 
 
@@ -2730,7 +2735,7 @@ void HierarchicalAllocatorProcess::allocate(
   } else {
     // Now offer the resources to each framework.
     foreachkey (const FrameworkID& frameworkId, offerable) {
-      offerCallback(frameworkId, offerable[frameworkId]);
+      offerCallback(frameworkId, offerable[frameworkId], allocationRun);
     }
   }
 
@@ -2738,6 +2743,8 @@ void HierarchicalAllocatorProcess::allocate(
   // allocator. We leverage the existing timer/cycle of offers to also do any
   // "deallocation" (inverse offers) necessary to satisfy maintenance needs.
   deallocate(slaveIds_);
+
+  allocationRun++;
 }
 
 

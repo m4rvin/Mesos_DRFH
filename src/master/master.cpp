@@ -703,7 +703,7 @@ void Master::initialize()
   // Initialize the allocator.
   allocator->initialize(
       flags.allocation_interval,
-      defer(self(), &Master::offer, lambda::_1, lambda::_2),
+      defer(self(), &Master::offer, lambda::_1, lambda::_2, lambda::_3),
       defer(self(), &Master::inverseOffer, lambda::_1, lambda::_2),
       weights,
       flags.fair_sharing_excluded_resource_names);
@@ -6470,7 +6470,8 @@ void Master::frameworkFailoverTimeout(const FrameworkID& frameworkId,
 
 
 void Master::offer(const FrameworkID& frameworkId,
-                   const hashmap<SlaveID, Resources>& resources)
+                   const hashmap<SlaveID, Resources>& resources,
+                   const uint64_t& allocationRun)
 {
   if (!frameworks.registered.contains(frameworkId) ||
       !frameworks.registered[frameworkId]->active) {
@@ -6556,6 +6557,8 @@ void Master::offer(const FrameworkID& frameworkId,
     offer->mutable_url()->MergeFrom(url);
     offer->mutable_resources()->MergeFrom(offered);
     offer->mutable_attributes()->MergeFrom(slave->info.attributes());
+
+    offer->set_allocation_run(allocationRun);
 
     // Add all framework's executors running on this slave.
     if (slave->executors.contains(framework->id())) {
