@@ -842,7 +842,7 @@ void HierarchicalAllocatorProcess::initialize(
   roleSorter->initialize(fairnessExcludeResourceNames);
   quotaRoleSorter->initialize(fairnessExcludeResourceNames);
 
-  allocationRun = 0;
+  allocationRun = 1;
 
   VLOG(1) << "Initialized hierarchical allocator process";
 
