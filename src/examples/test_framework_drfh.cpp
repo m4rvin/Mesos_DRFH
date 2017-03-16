@@ -160,6 +160,7 @@ uint64_t getQueuedTasks() {
 void printTotalStats()
 {
   LOG(INFO) << endl
+            << "Allocation run#"           << allocationRunNumber  << endl
             << "Total tasks launched = "   << totalTasksLaunched   << endl
             << "Total tasks not launched = "
             << totalTasksNotLaunched   << endl
@@ -199,7 +200,8 @@ void printOnFile() {
   if (!myfile.is_open())
     LOG(ERROR) << "Error opening the file to ouptut stats.";
   else {
-    myfile << receivedOffers        << " "
+    myfile << allocationRunNumber   << " "
+           << receivedOffers        << " "
            << offersDeclined        << " "
            << offersAccepted        << " "
            << offersUnused          << " "
@@ -273,16 +275,20 @@ public:
       exit(EXIT_SUCCESS);
     }
 
+    // Since we received the callback it means at least one offer is available.
+    allocationRunNumber = offers[0].allocation_run();
+
     uint64_t lastReadQueuedTaskNumber;
-    allocationRunNumber++;
     foreach (const Offer& offer, offers) {
       receivedOffers++;
       totalOffersReceived++;
 
+
+
       LOG(INFO) << "Received offer "
                 << offer.id() << " with "
                 << offer.resources() << " from allocation run#"
-                << offer.allocation_run();
+                << allocationRunNumber;
 
       Resources remaining = offer.resources();
 
