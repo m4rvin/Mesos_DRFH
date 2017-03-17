@@ -2196,6 +2196,8 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
 
   if(roleSorter->count() == 0) {
     VLOG(1) << "No allocations performed: there aren't registered frameworks.";
+    // reset allocationRun to enable next framework receive a 0-based metric.
+    allocationRun = 0;
     return;
   }
 
