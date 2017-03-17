@@ -30,7 +30,25 @@ cd $MESOS_FRAMEWORK_EXECUTABLES_PATH
 
 if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 
-	if [ "$3" -eq "85" ]; then
+	if [ "$3" -eq "100" ]; then
+		######### LogNorm U=100%
+
+		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.98326081367025,0.5" &
+		pid=$!
+		echo $pid
+
+		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.67444517092557,0.5" &
+		pid=$!
+		echo $pid
+
+		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-0.220310179804325,0.5" &
+		pid=$!
+		echo $pid
+
+		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-1.0004687373539,0.5" &
+		pid=$!
+		echo $pid
+	elif [ "$3" -eq "85" ]; then
 		######### LogNorm U=85%
 
 		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.82001088998788,0.5" &
