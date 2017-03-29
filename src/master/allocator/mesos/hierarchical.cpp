@@ -460,41 +460,41 @@ Option<tuple<SlaveID, Resources>>
 
   // Compare to be used in std::sort based on cpus.
   // Return true if first should go before than second. False otherwise.
-  auto compareCpuResource = [](
-      const tuple<SlaveID, Resources>& first,
-      const tuple<SlaveID, Resources>& second) {
-    Option<double> cpusFirst = std::get<1>(first).cpus();
-    Option<double> cpusSecond = std::get<1>(second).cpus();
+  auto compareCpuResource = [this](
+     const SlaveID& first,
+     const SlaveID& second) {
+    Option<double> cpusFirst = this->slaves[first].total.cpus();
+    Option<double> cpusSecond = this->slaves[second].total.cpus();
 
     if (cpusFirst.isSome() && cpusSecond.isSome()) {
-      if (cpusFirst.get() <= cpusSecond.get())
-        return true;
-      return false;
+     if (cpusFirst.get() <= cpusSecond.get())
+       return true;
+     return false;
     }
     else if (cpusFirst.isNone() && cpusSecond.isSome())
-      return true;
+     return true;
     else if (cpusFirst.isSome() && cpusSecond.isNone())
-      return false;
+     return false;
     else return true; // both are None, it doesn't matter which one go first.
   };
 
   // Compare to be used in std::sort based on mem.
   // Return true if first should go before than second. False otherwise.
-  auto compareMemResource = [](
-      const tuple<SlaveID, Resources>& first,
-      const tuple<SlaveID, Resources>& second) {
-    Option<Bytes> memFirst = std::get<1>(first).mem();
-    Option<Bytes> memSecond = std::get<1>(second).mem();
+  auto compareMemResource = [this](
+     const SlaveID& first,
+     const SlaveID& second) {
+    Option<Bytes> memFirst = this->slaves[first].total.mem();
+    Option<Bytes> memSecond = this->slaves[second].total.mem();
 
     if (memFirst.isSome() && memSecond.isSome()) {
-      if (memFirst.get() <= memSecond.get())
-        return true;
-      return false;
+     if (memFirst.get() <= memSecond.get())
+       return true;
+     return false;
     }
     else if (memFirst.isNone() && memSecond.isSome())
-      return true;
+     return true;
     else if (memFirst.isSome() && memSecond.isNone())
-      return false;
+     return false;
     else return true; // both are None, it doesn't matter which one go first.
   };
 
@@ -503,7 +503,7 @@ Option<tuple<SlaveID, Resources>>
   // Start putting the top id from the cpu vector into a hashset of ids. If
   // the id is already in then return the id, otherwise put the top d from the
   // mem vector. If the id is already in then return the id, otherwise
-  // go to the next position in both vectors and reapeat.
+  // go to the next position in both vectors and repeat.
   // NB: since the two vectors are built from the same source, they should
   // contain the same values so, sooner or later, one id will be returned.
   //  e.g.:
@@ -511,31 +511,31 @@ Option<tuple<SlaveID, Resources>>
   //  memSortedSlaves: 1|3|4|2|6|5 (slave ID 5 has the best mem)
   //  returned slave ID: 2
   auto selectMaxResources = [slaves] (
-      vector<tuple<SlaveID, Resources>> cpuSortedSlaves,
-      vector<tuple<SlaveID, Resources>> memSortedSlaves) {
+     vector<SlaveID> cpuSortedSlaves,
+     vector<SlaveID> memSortedSlaves) {
     CHECK_NE(static_cast<int>(cpuSortedSlaves.size()), 0);
     CHECK_NE(static_cast<int>(memSortedSlaves.size()), 0);
     CHECK_EQ(static_cast<int>(cpuSortedSlaves.size()),
-             static_cast<int>(slaves.size()));
+            static_cast<int>(slaves.size()));
     CHECK_EQ(static_cast<int>(memSortedSlaves.size()),
-             static_cast<int>(slaves.size()));
+            static_cast<int>(slaves.size()));
 
     hashset<SlaveID> scannedSlaveIds;
     // just in case the vector are simmetrical and we want avoid reallocation.
     scannedSlaveIds.reserve(slaves.size());
 
     for (int i = slaves.size()-1; i >= 0; i--) {
-      SlaveID slaveId = std::get<0>(cpuSortedSlaves[i]);
-      if (scannedSlaveIds.contains(slaveId))
-        return cpuSortedSlaves[i];
-      else
-        scannedSlaveIds.insert(slaveId);
+     SlaveID slaveId = cpuSortedSlaves[i];
+     if (scannedSlaveIds.contains(slaveId))
+       return cpuSortedSlaves[i];
+     else
+       scannedSlaveIds.insert(slaveId);
 
-      slaveId = std::get<0>(memSortedSlaves[i]);
-      if (scannedSlaveIds.contains(slaveId))
-        return memSortedSlaves[i];
-      else
-        scannedSlaveIds.insert(slaveId);
+     slaveId = memSortedSlaves[i];
+     if (scannedSlaveIds.contains(slaveId))
+       return memSortedSlaves[i];
+     else
+       scannedSlaveIds.insert(slaveId);
     }
     // If the above does not return then the vectors contain different element
     // but this is not possible, so exit with failure and check the sourcecode.
@@ -543,10 +543,11 @@ Option<tuple<SlaveID, Resources>>
     EXIT(EXIT_FAILURE);
   };
 
-  // Slaves to be sorted in ascending order by CPU
-  vector<tuple<SlaveID, Resources>> cpuSortedSlaves(
-      slaves.begin(),
-      slaves.end());
+  hashset<SlaveID> slaveIds = slaves.keys();
+  // Slaves to be sorted in ascending order by available CPU
+  vector<SlaveID> cpuSortedSlaves(
+     slaveIds.begin(),
+     slaveIds.end());
 
   auto startIt = cpuSortedSlaves.begin();
   auto endIt = cpuSortedSlaves.end();
@@ -554,13 +555,13 @@ Option<tuple<SlaveID, Resources>>
   for(int i = 0; i < static_cast<int>(cpuSortedSlaves.size()); i++)
   {
     LOG(INFO) << "sorted slaves by cpu in pos [" << i << "]="
-              << std::get<0>(cpuSortedSlaves[i]);
+             << cpuSortedSlaves[i];
   }
 
-  // Slaves to be sorted in ascending order by MEM
-  vector<tuple<SlaveID, Resources>> memSortedSlaves(
-        slaves.begin(),
-        slaves.end());
+  // Slaves to be sorted in ascending order by available MEM
+  vector<SlaveID> memSortedSlaves(
+     slaveIds.begin(),
+     slaveIds.end());
 
   startIt = memSortedSlaves.begin();
   endIt = memSortedSlaves.end();
@@ -568,17 +569,21 @@ Option<tuple<SlaveID, Resources>>
   for(int i = 0; i < static_cast<int>(memSortedSlaves.size()); i++)
   {
     LOG(INFO) << "sorted slaves by mem in pos [" << i << "]="
-              << std::get<0>(memSortedSlaves[i]);
+             << memSortedSlaves[i];
   }
 
   // Select the server with
-  tuple<SlaveID, Resources> slaveChosen =
-      selectMaxResources(cpuSortedSlaves, memSortedSlaves);
-  CHECK(slaves.erase(std::get<0>(slaveChosen)) == 1);
+  SlaveID slaveIdChosen =
+     selectMaxResources(cpuSortedSlaves, memSortedSlaves);
 
-  LOG(INFO) << "maxServerLikeHeuristic chose slave: "
-            << std::get<0>(slaveChosen);
-  return slaveChosen;
+  LOG(INFO) << "maxServerLikeHeuristic chose slave ID: "
+           << slaveIdChosen;
+  Option<std::tuple<SlaveID, Resources>> selected =
+     std::make_tuple(slaveIdChosen, slaves.get(slaveIdChosen).get());
+
+  CHECK(slaves.erase(slaveIdChosen) == 1);
+
+  return selected;
 }
 
 Option<tuple<SlaveID, Resources>>
@@ -592,6 +597,9 @@ Option<tuple<SlaveID, Resources>>
   auto compareCpuResource = [this](
       const SlaveID& first,
       const SlaveID& second) {
+    // NB: it doesn't matter if using allocater or realAllocated here
+    // because since the server is available to be chosen, it means that
+    // its allocated resources match the realAllocated ones.
     Option<double> cpusFirst = this->slaves[first].realAllocated.cpus();
     Option<double> cpusSecond = this->slaves[second].realAllocated.cpus();
 
