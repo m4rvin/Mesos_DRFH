@@ -438,13 +438,17 @@ Option<std::tuple<SlaveID, Resources>>
   }
 
   // No slave matched the framework's demand.
+  // TODO(danang) Instead of taking one randomly,
+  // choose the one with the nearest fitvalue.
   if (selectedSlaveId.isNone())
-    return None();
+    // return None();
+    selectedSlaveId = std::get<0>(slavesVect[0]);
 
   Option<std::tuple<SlaveID, Resources>> selected =
       std::make_tuple(
           selectedSlaveId.get(),
           slaves.get(selectedSlaveId.get()).get());
+
   CHECK(slaves.erase(selectedSlaveId.get()) == 1);
 
 
