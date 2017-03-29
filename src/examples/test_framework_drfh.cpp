@@ -85,8 +85,8 @@ double cpusTaskDemand;
 Bytes memTaskDemand;
 uint64_t taskDuration;
 Resources TASK_RESOURCES;
-static const double CPUS_PER_EXECUTOR = 0.1;
-static const int32_t MEM_PER_EXECUTOR = 32;
+static const double MIN_CPU = 0.01;
+static const int32_t MIN_MEM = 32; // megabytes
 // ---
 
 // Log files and stats variables
@@ -510,10 +510,10 @@ int main(int argc, char** argv)
           "Size, in bytes (i.e. B, MB, GB, ...), of each task's memory demand.",
           static_cast<const Bytes*>(nullptr),
           [](const Bytes& value) -> Option<Error> {
-            if (value.megabytes() < MEM_PER_EXECUTOR) {
+            if (value.megabytes() < MIN_MEM) {
               return Error(
                   "Please use a --task_memory_demand greater than " +
-                  stringify(MEM_PER_EXECUTOR) + " MB");
+                  stringify(MIN_MEM) + " MB");
             }
             return None();
           });
@@ -524,10 +524,10 @@ int main(int argc, char** argv)
          "How much cpus each task will require.",
          static_cast<const double*>(nullptr),
          [](const double& value) -> Option<Error> {
-           if (value < CPUS_PER_EXECUTOR) {
+           if (value < MIN_CPU) {
              return Error(
                  "Please use a --task_cpus_demand greater than " +
-                 stringify(CPUS_PER_EXECUTOR));
+                 stringify(MIN_CPU));
            }
            return None();
          });
