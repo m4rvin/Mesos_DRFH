@@ -56,6 +56,7 @@ using process::Owned;
 using process::Timeout;
 
 int blind_policy_log_level = -1;
+int aggregatedNonAllocatableServers = 0;
 
 const std::string RANDOM_HEURISTIC = "random";
 const std::string MAX_SERVER_LIKE_HEURISTIC = "maxServerLike";
@@ -2210,6 +2211,7 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
     VLOG(1) << "No allocations performed: there aren't registered frameworks.";
     // reset allocationRun to enable next framework receive a 0-based metric.
     allocationRun = 0;
+    aggregatedNonAllocatableServers = 0;
     return;
   }
 
@@ -2248,6 +2250,18 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
   if (slavesResources.size() == 0) {
     allocatableSlaves = false;
     VLOG(1) << "No allocations performed: there aren't available resources.";
+  }
+
+  int nonAllocatableSlaves = static_cast<int>(slaveIds_.size()) - static_cast<int>(slavesResources.size());
+  aggregatedNonAllocatableServers += nonAllocatableSlaves;
+  std::ofstream myfile;
+  myfile.open ("/home/m4rvin/mesos_drfh/ClusterHandling/OUTPUT/clusterPoolStats.dat", std::ofstream::app);
+  if (!myfile.is_open())
+    LOG(ERROR) << "Error opening the file to ouptut stats.";
+  else {
+    myfile << nonAllocatableSlaves << " "
+           << aggregatedNonAllocatableServers << endl;
+    myfile.close();
   }
 
   // A framework could be blacklisted in the current allocation cycle,
@@ -2360,6 +2374,7 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
   }
 
   deallocate(slaveIds_);
+
 
   allocationRun++;
 }
