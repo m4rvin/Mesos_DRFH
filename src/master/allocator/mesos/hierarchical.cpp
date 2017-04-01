@@ -2252,10 +2252,14 @@ void HierarchicalAllocatorProcess::allocateToFrameworks(
     VLOG(1) << "No allocations performed: there aren't available resources.";
   }
 
-  int nonAllocatableSlaves = static_cast<int>(slaveIds_.size()) - static_cast<int>(slavesResources.size());
+  int nonAllocatableSlaves =
+      static_cast<int>(slaveIds_.size()) -
+      static_cast<int>(slavesResources.size());
   aggregatedNonAllocatableServers += nonAllocatableSlaves;
   std::ofstream myfile;
-  myfile.open ("/home/m4rvin/mesos_drfh/ClusterHandling/OUTPUT/clusterPoolStats.dat", std::ofstream::app);
+  myfile.open (
+      "/home/m4rvin/mesos_drfh/ClusterHandling/OUTPUT/clusterPoolStats.dat",
+      std::ofstream::app);
   if (!myfile.is_open())
     LOG(ERROR) << "Error opening the file to ouptut stats.";
   else {
