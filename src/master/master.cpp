@@ -3768,11 +3768,11 @@ void Master::_accept(
   // tasks when they get launched.
   Resources _consumedResources;
 
-  /*
+
   // We keep track of the number of tasks launched (i.e. the ones with
   // operation LAUNCH).
   uint64_t _tasksLaunched = 0;
-  */
+
 
   // We keep track of the shared resources from the offers separately.
   // `offeredSharedResources` can be modified by CREATE/DESTROY but we
@@ -4195,7 +4195,7 @@ void Master::_accept(
 
             _offeredResources -= consumed;
             _consumedResources += consumed;
-            // _tasksLaunched++;
+            _tasksLaunched++;
 
             // TODO(bmahler): Consider updating this log message to
             // indicate when the executor is also being launched.
@@ -4435,13 +4435,12 @@ void Master::_accept(
             << " => " << _consumedResources
             << " over offered => " << offeredResources;
 
-  if (!_consumedResources.empty()) {
+  /*  if (!_consumedResources.empty()) {
     allocator->allocateActualResources(slaveId, _consumedResources);
     allocator->updateMeanFrameworkDemand(frameworkId, _consumedResources);
   }
+  */
 
-
-  /*
   // Return a Resources containing the mean task demand computed from the
   // arguments per each resoruce type.
   auto getMeanTaskDemand = [] (
@@ -4493,8 +4492,9 @@ void Master::_accept(
   };
 
 
-  // Update mean demand for this framework.
+  // Update actual allocated resources and mean demand for this framework.
   if (!_consumedResources.empty()) {
+    allocator->allocateActualResources(slaveId, _consumedResources);
 
     Resources meanTaskDemand = getMeanTaskDemand(
            _consumedResources,
@@ -4502,10 +4502,17 @@ void Master::_accept(
     CHECK_SOME(meanTaskDemand.cpus());
     CHECK_SOME(meanTaskDemand.mem());
 
+    // Update mean demand with the meanTaskDemand only if other task could have
+    // been filled into the current offeredResources. (i.e. one offer)
+    // Otherwise you cannot meanTaskDemand could be lower than your actual
+    // demand simply because there was no space in the offer.
+    // (the probability it was so small to fill the remaining space is very low
     if (checkTaskFitting(meanTaskDemand, offeredResources))
-       allocator->updateMeanFrameworkDemand(frameworkId, meanTaskDemand);
+       allocator->updateMeanFrameworkDemand(frameworkId, None());
+    else
+      allocator->updateMeanFrameworkDemand(frameworkId, meanTaskDemand);
   }
-  */
+
 
   // NB: resources not yet used are tracked using deallocateActualResources()
   // Currently it has been set only for task termination

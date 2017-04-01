@@ -384,6 +384,8 @@ Option<std::tuple<SlaveID, Resources>>
       hashmap<SlaveID, Resources>& slaves,
       const FrameworkID& frameworkId)
 {
+  LOG(INFO) << "STARTING bestFitDrfhHeuristic";
+
   double fittingValue = std::numeric_limits<double>::max();
   Option<SlaveID> chosenSlaveId = None();
 
@@ -1458,58 +1460,74 @@ void HierarchicalAllocatorProcess::requestResources(
 
 void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
     const FrameworkID& frameworkId,
-    const Resources& demand)
+    const  Option<Resources>& demand)
 {
   Option<string> slaveSelectionHeuristic =
       os::getenv("SLAVE_SELECTION_HEURISTIC");
   CHECK_SOME(slaveSelectionHeuristic);
   // No need to update the mean framework demand if not using an heuristic
   // which need this information.
-  if (slaveSelectionHeuristic.get().compare(FIRST_FIT_DRFH_HEURISTIC) != 0 ||
-      slaveSelectionHeuristic.get().compare(BEST_FIT_DRFH_HEURISTIC) != 0)
+  if (slaveSelectionHeuristic.get().compare(FIRST_FIT_DRFH_HEURISTIC) == 0 ||
+      slaveSelectionHeuristic.get().compare(BEST_FIT_DRFH_HEURISTIC) == 0) {
+    // Return a Resources containing the mean framework demand computed from the
+    // arguments per each resource type.
+    auto getMeanFrameworkDemand = [] (
+       const Resources& _consumedResources,
+       const uint64_t& _totalOffersAccepted) {
+      double _meanFrameworkCpusDemand = 0.0;
+      uint64_t _meanFrameworkMemDemandMB = 0;
+      if (_consumedResources.cpus().isSome())
+       _meanFrameworkCpusDemand =
+           _consumedResources.cpus().get()/_totalOffersAccepted;
+      if (_consumedResources.mem().isSome())
+       // Approximated mean task demand (NB: division by integer)
+       _meanFrameworkMemDemandMB =
+           _consumedResources.mem().get().megabytes()/_totalOffersAccepted;
+
+      Resources meanTaskDemand = Resources::parse(
+         "cpus:" + stringify(_meanFrameworkCpusDemand) +
+         ";mem:" + stringify(_meanFrameworkMemDemandMB)).get();
+      return meanTaskDemand;
+    };
+
+    if(frameworks.get(frameworkId).isNone())
+      return;
+
+    // TODO(danang) Handle overflow of numerical variables (e.g. reset
+    // totalConsumed to the last mean value and totalOffersAccepted to 1).
+
+    if (demand.isSome()) {
+      frameworks[frameworkId].totalConsumed += demand.get();
+      frameworks[frameworkId].totalOffersAccepted++;
+
+      frameworks[frameworkId].meanFrameworkDemand = getMeanFrameworkDemand (
+          frameworks[frameworkId].totalConsumed,
+          frameworks[frameworkId].totalOffersAccepted);
+    }
+    else {
+      Resources _meanFrameworkDemand = getMeanFrameworkDemand (
+          frameworks[frameworkId].totalConsumed,
+          frameworks[frameworkId].totalOffersAccepted);
+
+      // Forcing meanFrameworkDemand to double its value:
+      // if passing here then totalConsumed will not be consistent anymore.
+      frameworks[frameworkId].meanFrameworkDemand += _meanFrameworkDemand;
+
+      frameworks[frameworkId].totalOffersAccepted++;
+    }
+
+
+    LOG(INFO) << "Mean framework demand for framework " << frameworkId
+              << " updated to " << frameworks[frameworkId].meanFrameworkDemand;
+
+    LOG(INFO) << "Total resources consumed for framework " << frameworkId
+              << " updated to " << frameworks[frameworkId].totalConsumed;
+
+    LOG(INFO) << "Total offers accepted for framework " << frameworkId
+              << " updated to " << frameworks[frameworkId].totalOffersAccepted;
+  }
+  else
     return;
-
-  // Return a Resources containing the mean framework demand computed from the
-  // arguments per each resource type.
-  auto getMeanFrameworkDemand = [] (
-     const Resources& _consumedResources,
-     const uint64_t& _totalOffersAccepted) {
-    double _meanFrameworkCpusDemand = 0.0;
-    uint64_t _meanFrameworkMemDemandMB = 0;
-    if (_consumedResources.cpus().isSome())
-     _meanFrameworkCpusDemand =
-         _consumedResources.cpus().get()/_totalOffersAccepted;
-    if (_consumedResources.mem().isSome())
-     // Approximated mean task demand (NB: division by integer)
-     _meanFrameworkMemDemandMB =
-         _consumedResources.mem().get().megabytes()/_totalOffersAccepted;
-
-    Resources meanTaskDemand = Resources::parse(
-       "cpus:" + stringify(_meanFrameworkCpusDemand) +
-       ";mem:" + stringify(_meanFrameworkMemDemandMB)).get();
-    return meanTaskDemand;
-  };
-
-  if(frameworks.get(frameworkId).isNone())
-    return;
-
-  // TODO(danang) Handle overflow of numerical variables (e.g. reset
-  // totalConsumed to the last mean value and totalOffersAccepted to 1).
-  frameworks[frameworkId].totalConsumed += demand;
-  frameworks[frameworkId].totalOffersAccepted++;
-
-  frameworks[frameworkId].meanFrameworkDemand = getMeanFrameworkDemand (
-      frameworks[frameworkId].totalConsumed,
-      frameworks[frameworkId].totalOffersAccepted);
-
-  LOG(INFO) << "Mean framework demand for framework " << frameworkId
-            << " updated to " << frameworks[frameworkId].meanFrameworkDemand;
-
-  LOG(INFO) << "Total resources consumed for framework " << frameworkId
-            << " updated to " << frameworks[frameworkId].totalConsumed;
-
-  LOG(INFO) << "Total offers accepted for framework " << frameworkId
-            << " updated to " << frameworks[frameworkId].totalOffersAccepted;
 }
 
 void HierarchicalAllocatorProcess::updateAllocation(

@@ -220,7 +220,7 @@ public:
 
   void updateMeanFrameworkDemand(
       const FrameworkID& frameworkId,
-      const Resources& demand);
+      const  Option<Resources>& demand);
 
 
 protected:

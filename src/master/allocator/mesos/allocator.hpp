@@ -169,7 +169,7 @@ public:
 
   void updateMeanFrameworkDemand(
       const FrameworkID& frameworkId,
-      const Resources& demand);
+      const  Option<Resources>& demand);
 
 private:
   MesosAllocator();
@@ -315,7 +315,7 @@ public:
 
   virtual void updateMeanFrameworkDemand(
       const FrameworkID& frameworkId,
-      const Resources& demand) {};
+      const  Option<Resources>& demand) {};
 };
 
 
@@ -718,7 +718,7 @@ inline void MesosAllocator<AllocatorProcess>::deallocateActualResources(
 template <typename AllocatorProcess>
 inline void MesosAllocator<AllocatorProcess>::updateMeanFrameworkDemand(
     const FrameworkID& frameworkId,
-    const Resources& demand)
+    const  Option<Resources>& demand)
 {
   process::dispatch(
       process,
