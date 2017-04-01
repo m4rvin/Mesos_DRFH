@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <complex>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -375,6 +376,90 @@ Option<tuple<SlaveID, Resources>>
   slaves.erase(std::get<0>(*it));
   return selectedSlave;
 }
+
+
+Option<std::tuple<SlaveID, Resources>>
+  HierarchicalAllocatorProcess::bestFitDrfhHeuristic (
+      hashmap<SlaveID, Resources>& slaves,
+      const FrameworkID& frameworkId)
+{
+  double fittingValue = 0.0;
+  Option<SlaveID> chosenSlaveId = None();
+
+  Resources _meanFrameworkDemand = frameworks[frameworkId].meanFrameworkDemand;
+
+  // No measures on task demand yet. Take a random server.
+  if (_meanFrameworkDemand.cpus().isNone() ||
+      _meanFrameworkDemand.mem().isNone()) {
+    chosenSlaveId = *(slaves.keys().begin());
+  }
+  else {
+    double cpuDemand = _meanFrameworkDemand.cpus().get();
+    Bytes memDemand = _meanFrameworkDemand.mem().get();
+    // Check cluster has cpu and mem resources and get them
+    CHECK_SOME(frameworkSorters["*"]->totalScalarQuantities().cpus());
+    double totalClusterCpu =
+        frameworkSorters["*"]->totalScalarQuantities().cpus().get();
+    CHECK_SOME(frameworkSorters["*"]->totalScalarQuantities().mem());
+    Bytes totalClusterMem =
+        frameworkSorters["*"]->totalScalarQuantities().mem().get();
+
+    // Compute demand share for cpu
+    double cpuDemandShare = cpuDemand/totalClusterCpu;
+    // cpu demand share normalized is 1 so we don't compute it
+    // double cpuDemandShareNormalized = 1.0;
+
+    // Compute demand share for mem and normalize against cpu demand share
+    double memDemandShare =
+        static_cast<double>(memDemand.megabytes())/
+        static_cast<double>(totalClusterMem.megabytes());
+    double memDemandShareNormalized = memDemandShare/cpuDemandShare;
+
+    foreachpair(const SlaveID& slaveId,
+                const Resources& resources,
+                slaves) {
+      Resources slaveAvailabilities = resources;
+      // Compute available share for cpu
+      CHECK_SOME(slaveAvailabilities.cpus());
+      double cpusAvailableShare =
+          slaveAvailabilities.cpus().get()/totalClusterCpu;
+      // cpu available share normalized is 1 so we don't compute it
+      // double cpusAvailableShareNormalized  = 1.0;
+
+      // Compute available share for mem and normalize against
+      // cpu available share
+      CHECK_SOME(slaveAvailabilities.mem());
+      double memAvailableShare =
+          static_cast<double>(slaveAvailabilities.mem().get().megabytes())/
+          static_cast<double>(totalClusterMem.megabytes());
+      double memAvailableShareNormalized = memAvailableShare/cpusAvailableShare;
+
+      // Compute L1 norm
+      // NB: since the cpusDemandShareNormalized and memAvailableShareNormalized
+      // are both 1, we omit them in the norm calculation.
+
+      double newFittingValue = std::min(
+                  fittingValue,
+                  abs(memDemandShareNormalized - memAvailableShareNormalized));
+
+      // Check if this server has a lower fittingValue and choose it as the
+      // chosen slave.
+      if (newFittingValue != fittingValue) {
+        fittingValue = newFittingValue;
+        chosenSlaveId = slaveId;
+      }
+    }
+  }
+  Option<std::tuple<SlaveID, Resources>> selected =
+      std::make_tuple(
+          chosenSlaveId.get(),
+          slaves.get(chosenSlaveId.get()).get());
+
+  CHECK(slaves.erase(chosenSlaveId.get()) == 1);
+
+  return selected;
+}
+
 
 Option<std::tuple<SlaveID, Resources>>
   HierarchicalAllocatorProcess::firstFitDrfhHeuristic (

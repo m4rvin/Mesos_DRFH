@@ -253,6 +253,9 @@ protected:
   Option<std::tuple<SlaveID, Resources>> firstFitDrfhHeuristic
     (hashmap<SlaveID, Resources>& slaves,  const FrameworkID& frameworkId);
 
+  Option<std::tuple<SlaveID, Resources>> bestFitDrfhHeuristic
+  (hashmap<SlaveID, Resources>& slaves, const FrameworkID& frameworkId);
+
   // Idempotent helpers for pausing and resuming allocation.
   void pause();
   void resume();
