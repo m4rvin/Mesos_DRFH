@@ -219,6 +219,8 @@ int main(int argc, char** argv)
          "  maxServerLike\n"
          "  maxAvailableServer\n"
          "  balancedResources\n"
+         "  firstFitDRFH\n"
+         "  bestFitDRFH\n"
          );
 
   Try<flags::Warnings> load = flags.load("MESOS_", argc, argv);

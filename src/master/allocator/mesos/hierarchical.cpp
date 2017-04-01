@@ -64,6 +64,7 @@ const std::string MAX_SERVER_LIKE_HEURISTIC = "maxServerLike";
 const std::string MAX_AVAILABLE_SERVER_HEURISTIC = "maxAvailableServer";
 const std::string BALANCED_RESOURCES_HEURISTIC = "balancedResources";
 const std::string FIRST_FIT_DRFH_HEURISTIC = "firstFitDRFH";
+const std::string BEST_FIT_DRFH_HEURISTIC = "bestFitDRFH";
 
 
 
@@ -383,7 +384,7 @@ Option<std::tuple<SlaveID, Resources>>
       hashmap<SlaveID, Resources>& slaves,
       const FrameworkID& frameworkId)
 {
-  double fittingValue = 0.0;
+  double fittingValue = std::numeric_limits<double>::max();
   Option<SlaveID> chosenSlaveId = None();
 
   Resources _meanFrameworkDemand = frameworks[frameworkId].meanFrameworkDemand;
@@ -397,15 +398,20 @@ Option<std::tuple<SlaveID, Resources>>
     double cpuDemand = _meanFrameworkDemand.cpus().get();
     Bytes memDemand = _meanFrameworkDemand.mem().get();
     // Check cluster has cpu and mem resources and get them
+
     CHECK_SOME(frameworkSorters["*"]->totalScalarQuantities().cpus());
     double totalClusterCpu =
         frameworkSorters["*"]->totalScalarQuantities().cpus().get();
+
     CHECK_SOME(frameworkSorters["*"]->totalScalarQuantities().mem());
     Bytes totalClusterMem =
         frameworkSorters["*"]->totalScalarQuantities().mem().get();
 
     // Compute demand share for cpu
     double cpuDemandShare = cpuDemand/totalClusterCpu;
+    LOG(WARNING) << "cpuDemandShare = " << cpuDemandShare
+                << " using cpuDemand = " << cpuDemand
+                << " and totalClusterCpus = " << totalClusterCpu;
     // cpu demand share normalized is 1 so we don't compute it
     // double cpuDemandShareNormalized = 1.0;
 
@@ -413,49 +419,90 @@ Option<std::tuple<SlaveID, Resources>>
     double memDemandShare =
         static_cast<double>(memDemand.megabytes())/
         static_cast<double>(totalClusterMem.megabytes());
+
+    /*LOG(WARNING) << "memDemandShare = " << memDemandShare
+                << " using memDemand in MB = " << memDemand.megabytes()
+                << " and totalClusterMem in MB = "
+                << totalClusterMem.megabytes();*/
     double memDemandShareNormalized = memDemandShare/cpuDemandShare;
 
+    int checkStep = 0;
     foreachpair(const SlaveID& slaveId,
                 const Resources& resources,
                 slaves) {
       Resources slaveAvailabilities = resources;
       // Compute available share for cpu
+
       CHECK_SOME(slaveAvailabilities.cpus());
+
       double cpusAvailableShare =
           slaveAvailabilities.cpus().get()/totalClusterCpu;
+      /*LOG(WARNING) << "cpusAvailableShare = " << cpusAvailableShare
+                      << " using slaveAvailableCpus = "
+                      << slaveAvailabilities.cpus().get()
+                      << " and totalClusterCpu = "  << totalClusterCpu;*/
       // cpu available share normalized is 1 so we don't compute it
       // double cpusAvailableShareNormalized  = 1.0;
 
       // Compute available share for mem and normalize against
       // cpu available share
+
       CHECK_SOME(slaveAvailabilities.mem());
       double memAvailableShare =
           static_cast<double>(slaveAvailabilities.mem().get().megabytes())/
           static_cast<double>(totalClusterMem.megabytes());
       double memAvailableShareNormalized = memAvailableShare/cpusAvailableShare;
 
+     /* LOG(WARNING) << "memAvailableShare = " << memAvailableShare
+                  << " using memAvailableSlave  in MB = "
+                  << slaveAvailabilities.mem().get().megabytes()
+                  << " and totalClusterMem in MB = "
+                  << totalClusterMem.megabytes();
+
+      LOG(WARNING) << "memAvailableShareNormalized = "
+                  << memAvailableShareNormalized
+                  << " using memAvailableShare = " << memAvailableShare
+                  << " and cpusAvailableShare = "  << cpusAvailableShare;*/
       // Compute L1 norm
       // NB: since the cpusDemandShareNormalized and memAvailableShareNormalized
       // are both 1, we omit them in the norm calculation.
 
+
       double newFittingValue = std::min(
                   fittingValue,
                   abs(memDemandShareNormalized - memAvailableShareNormalized));
-
+      LOG(INFO) << "Comparing fittingValue=" << fittingValue
+                  << " against abs() of "
+                  << memDemandShareNormalized - memAvailableShareNormalized
+                  << " i.e. = "
+                  << abs(memDemandShareNormalized - memAvailableShareNormalized)
+                  << " gave newfittingValue = " << newFittingValue;
       // Check if this server has a lower fittingValue and choose it as the
       // chosen slave.
-      if (newFittingValue != fittingValue) {
+      if (newFittingValue != fittingValue || newFittingValue == 0.0) {
         fittingValue = newFittingValue;
         chosenSlaveId = slaveId;
+        LOG(INFO) << "checkStep#" << checkStep
+            << " - Selected slave id " << slaveId
+            << " with resources " << resources
+            << " for a meanFrameworkDemand of " << _meanFrameworkDemand
+            << " using fitting Value = " << fittingValue
+            << " comparing mem demand share normalized "
+            << memDemandShareNormalized
+            << " against mem avail share normalized"
+            << memAvailableShareNormalized;
       }
+      checkStep++;
     }
   }
+
   Option<std::tuple<SlaveID, Resources>> selected =
       std::make_tuple(
           chosenSlaveId.get(),
           slaves.get(chosenSlaveId.get()).get());
 
   CHECK(slaves.erase(chosenSlaveId.get()) == 1);
+
 
   return selected;
 }
@@ -1418,7 +1465,8 @@ void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
   CHECK_SOME(slaveSelectionHeuristic);
   // No need to update the mean framework demand if not using an heuristic
   // which need this information.
-  if (slaveSelectionHeuristic.get().compare(FIRST_FIT_DRFH_HEURISTIC) != 0)
+  if (slaveSelectionHeuristic.get().compare(FIRST_FIT_DRFH_HEURISTIC) != 0 ||
+      slaveSelectionHeuristic.get().compare(BEST_FIT_DRFH_HEURISTIC) != 0)
     return;
 
   // Return a Resources containing the mean framework demand computed from the
@@ -2271,6 +2319,8 @@ HierarchicalAllocatorProcess::pickOutSlave(
     return balancedResourcesHeuristic(slaves);
   else if (heuristic.compare(FIRST_FIT_DRFH_HEURISTIC) == 0)
     return firstFitDrfhHeuristic(slaves, frameworkId);
+  else if (heuristic.compare(BEST_FIT_DRFH_HEURISTIC) == 0)
+    return bestFitDrfhHeuristic(slaves, frameworkId);
   else if (heuristic.compare(RANDOM_HEURISTIC) == 0)
       return randomServerHeuristic(slaves);
   LOG(FATAL) << endl << endl
