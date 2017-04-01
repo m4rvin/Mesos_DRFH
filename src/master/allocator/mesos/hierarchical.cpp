@@ -510,6 +510,7 @@ Option<std::tuple<SlaveID, Resources>>
 }
 
 
+
 Option<std::tuple<SlaveID, Resources>>
   HierarchicalAllocatorProcess::firstFitDrfhHeuristic (
       hashmap<SlaveID, Resources>& slaves,
@@ -1460,7 +1461,8 @@ void HierarchicalAllocatorProcess::requestResources(
 
 void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
     const FrameworkID& frameworkId,
-    const  Option<Resources>& demand)
+    const Resources& demand,
+    const bool& force)
 {
   Option<string> slaveSelectionHeuristic =
       os::getenv("SLAVE_SELECTION_HEURISTIC");
@@ -1496,25 +1498,18 @@ void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
     // TODO(danang) Handle overflow of numerical variables (e.g. reset
     // totalConsumed to the last mean value and totalOffersAccepted to 1).
 
-    if (demand.isSome()) {
+    if (!force)
       frameworks[frameworkId].totalConsumed += demand.get();
-      frameworks[frameworkId].totalOffersAccepted++;
-
-      frameworks[frameworkId].meanFrameworkDemand = getMeanFrameworkDemand (
-          frameworks[frameworkId].totalConsumed,
-          frameworks[frameworkId].totalOffersAccepted);
-    }
-    else {
-      Resources _meanFrameworkDemand = getMeanFrameworkDemand (
-          frameworks[frameworkId].totalConsumed,
-          frameworks[frameworkId].totalOffersAccepted);
-
-      // Forcing meanFrameworkDemand to double its value:
+    else
+      // Forcing meanFrameworkDemand to use the double of demand received.
       // if passing here then totalConsumed will not be consistent anymore.
-      frameworks[frameworkId].meanFrameworkDemand += _meanFrameworkDemand;
+      frameworks[frameworkId].totalConsumed += demand.get() + demand.get();
 
-      frameworks[frameworkId].totalOffersAccepted++;
-    }
+    frameworks[frameworkId].totalOffersAccepted++;
+
+    frameworks[frameworkId].meanFrameworkDemand = getMeanFrameworkDemand (
+        frameworks[frameworkId].totalConsumed,
+        frameworks[frameworkId].totalOffersAccepted);
 
 
     LOG(INFO) << "Mean framework demand for framework " << frameworkId

@@ -422,7 +422,8 @@ public:
    */
   virtual void updateMeanFrameworkDemand(
       const FrameworkID& frameworkId,
-      const Option<Resources>& demand) {};
+      const Resources& demand,
+      const bool& force) {};
 };
 
 } // namespace allocator {
