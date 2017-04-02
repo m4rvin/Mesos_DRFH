@@ -65,6 +65,7 @@ const std::string MAX_AVAILABLE_SERVER_HEURISTIC = "maxAvailableServer";
 const std::string BALANCED_RESOURCES_HEURISTIC = "balancedResources";
 const std::string FIRST_FIT_DRFH_HEURISTIC = "firstFitDRFH";
 const std::string BEST_FIT_DRFH_HEURISTIC = "bestFitDRFH";
+const std::string BEST_FIT_HEURISTIC = "bestFit";
 
 
 
@@ -509,6 +510,94 @@ Option<std::tuple<SlaveID, Resources>>
   return selected;
 }
 
+Option<std::tuple<SlaveID, Resources>>
+  HierarchicalAllocatorProcess::bestFitHeuristic (
+      hashmap<SlaveID, Resources>& slaves,
+      const FrameworkID& frameworkId)
+{
+  LOG(INFO) << "STARTING bestFitHeuristic";
+
+  Option<SlaveID> chosenSlaveId = None();
+
+  Resources _meanFrameworkDemand = frameworks[frameworkId].meanFrameworkDemand;
+
+  // No measures on task demand yet. Take a random server.
+  if (_meanFrameworkDemand.cpus().isNone() ||
+      _meanFrameworkDemand.mem().isNone()) {
+    chosenSlaveId = *(slaves.keys().begin());
+  }
+  else {
+    double cpuDemand = _meanFrameworkDemand.cpus().get();
+    Bytes memDemand = _meanFrameworkDemand.mem().get();
+    // Check cluster has cpu and mem resources and get them
+
+    int checkStep = 0;
+
+    foreachpair(const SlaveID& slaveId,
+                const Resources& resources,
+                slaves) {
+      Resources slaveAvailabilities = resources;
+      // Compute available share for cpu
+
+      CHECK_SOME(slaveAvailabilities.cpus());
+      CHECK_SOME(slaveAvailabilities.mem());
+
+      if ((slaveAvailabilities.cpus().get() - cpuDemand) >= 0 &&
+          (slaveAvailabilities.mem().get() - memDemand) >= 0) {
+        // Check if the previously chosen Slave is better than the current one.
+        if (chosenSlaveId.isNone())
+          // no slave already chosen. Select the current.
+          chosenSlaveId = slaveId;
+        else {
+          Resources chosenSlaveResources =
+              slaves.get(chosenSlaveId.get()).get();
+          if (slaveAvailabilities.cpus().get()
+              < chosenSlaveResources.cpus().get() &&
+              slaveAvailabilities.mem().get()
+              < chosenSlaveResources.mem().get())
+            // The current is better than the previous one.
+            chosenSlaveId = slaveId;
+        }
+        LOG(INFO) << "checkStep#" << checkStep
+                         << " - examined slave id " << slaveId
+                         << " with resources " << resources
+                         << " to check if it better fit meanFrameworDemand of "
+                         << _meanFrameworkDemand
+                         << ". Current best slave has id: "
+                         << chosenSlaveId.get();
+      }
+      else
+        LOG(INFO) << "checkStep#" << checkStep
+                  << " - slave id " << slaveId
+                  << " with resources " << resources
+                  << " does not contain meanFrameworDemand "
+                  << _meanFrameworkDemand;
+
+      checkStep++;
+    }
+  }
+
+
+  // No slave matched the framework's demand.
+  // TODO(danang) Instead of taking one randomly,
+  // choose the one with the nearest fitvalue.
+  if (chosenSlaveId.isNone()) {
+    LOG(INFO) <<"No slave fit frameworkDemand. Choosing randomly";
+    chosenSlaveId = *(slaves.keys().begin());
+  }
+
+  LOG(INFO) <<"Chosen best slave has id: " << chosenSlaveId.get();
+
+
+  Option<std::tuple<SlaveID, Resources>> selected =
+      std::make_tuple(
+          chosenSlaveId.get(),
+          slaves.get(chosenSlaveId.get()).get());
+
+  CHECK(slaves.erase(chosenSlaveId.get()) == 1);
+
+  return selected;
+}
 
 
 Option<std::tuple<SlaveID, Resources>>
@@ -1470,7 +1559,8 @@ void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
   // No need to update the mean framework demand if not using an heuristic
   // which need this information.
   if (slaveSelectionHeuristic.get().compare(FIRST_FIT_DRFH_HEURISTIC) == 0 ||
-      slaveSelectionHeuristic.get().compare(BEST_FIT_DRFH_HEURISTIC) == 0) {
+      slaveSelectionHeuristic.get().compare(BEST_FIT_DRFH_HEURISTIC) == 0 ||
+      slaveSelectionHeuristic.get().compare(BEST_FIT_HEURISTIC) == 0) {
     // Return a Resources containing the mean framework demand computed from the
     // arguments per each resource type.
     auto getMeanFrameworkDemand = [] (
@@ -1499,11 +1589,11 @@ void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
     // totalConsumed to the last mean value and totalOffersAccepted to 1).
 
     if (!force)
-      frameworks[frameworkId].totalConsumed += demand.get();
+      frameworks[frameworkId].totalConsumed += demand;
     else
       // Forcing meanFrameworkDemand to use the double of demand received.
       // if passing here then totalConsumed will not be consistent anymore.
-      frameworks[frameworkId].totalConsumed += demand.get() + demand.get();
+      frameworks[frameworkId].totalConsumed += demand + demand;
 
     frameworks[frameworkId].totalOffersAccepted++;
 
@@ -2334,6 +2424,8 @@ HierarchicalAllocatorProcess::pickOutSlave(
     return firstFitDrfhHeuristic(slaves, frameworkId);
   else if (heuristic.compare(BEST_FIT_DRFH_HEURISTIC) == 0)
     return bestFitDrfhHeuristic(slaves, frameworkId);
+  else if (heuristic.compare(BEST_FIT_HEURISTIC) == 0)
+     return bestFitHeuristic(slaves, frameworkId);
   else if (heuristic.compare(RANDOM_HEURISTIC) == 0)
       return randomServerHeuristic(slaves);
   LOG(FATAL) << endl << endl

@@ -28,6 +28,8 @@ cd $MESOS_EXECUTABLES_PATH
 
 GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFitDRFH &
 
+#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFit &
+
 pid=$!
 echo $pid
 echo $pid >> "$CLUSTER_NODES_PIDS_FILEPATH"

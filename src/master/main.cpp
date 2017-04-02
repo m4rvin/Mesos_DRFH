@@ -221,6 +221,7 @@ int main(int argc, char** argv)
          "  balancedResources\n"
          "  firstFitDRFH\n"
          "  bestFitDRFH\n"
+         "  bestFit\n"
          );
 
   Try<flags::Warnings> load = flags.load("MESOS_", argc, argv);
