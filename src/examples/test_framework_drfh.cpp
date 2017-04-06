@@ -110,6 +110,9 @@ uint64_t receivedOffers = 0;
 uint64_t offersDeclined = 0;
 uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
+
+double sumOfTaskWaitTimes = 0.0;
+double totalSumOfTaskWaitTimes = 0.0;
 // ---
 
 class QueuedTask {
@@ -132,9 +135,9 @@ public:
     this->dequeueTime = None();
   }
 
-  void printWaitTime(){
-    printf("Wait time is = %.f\n",
-           difftime(this->dequeueTime.get(), this->enqueueTime.get()));
+  double getWaitTime(){
+    CHECK_SOME(this->dequeueTime); // could have been cleared
+    return difftime(this->dequeueTime.get(), this->enqueueTime.get());
   }
 
 private:
@@ -213,7 +216,9 @@ void printTotalStats()
             << "Total offers received = "  << totalOffersReceived  << endl
             << "Total offers declined = "  << totalOffersDeclined  << endl
             << "Total offers accepted = "  << totalOffersAccepted  << endl
-            << "Total offers unused = "    << totalOffersUnused;
+            << "Total offers unused = "    << totalOffersUnused    << endl
+            << "mean wait time for Total tasks launched = "
+            << totalSumOfTaskWaitTimes/totalTasksLaunched;
 }
 
 void resetStats() {
@@ -223,6 +228,7 @@ void resetStats() {
   offersDeclined  = 0;
   offersAccepted  = 0;
   offersUnused    = 0;
+  sumOfTaskWaitTimes = 0.0;
 }
 
 void printStats()
@@ -258,7 +264,8 @@ void printOnFile() {
            << tasksLaunched         << " "
            << tasksNotLaunched      << " "
            << totalTasksLaunched    << " "
-           << totalTasksNotLaunched << endl;
+           << totalTasksNotLaunched << " "
+           << totalSumOfTaskWaitTimes/totalTasksLaunched << endl;
     myfile.close();
   }
 }
@@ -370,7 +377,8 @@ public:
           remaining -= resources.get();
           tasksToLaunch.push_back(task);
 
-          taskDequeued.printWaitTime();
+          double taskWaitTime = taskDequeued.getWaitTime();
+          sumOfTaskWaitTimes += taskWaitTime;
 
           LOG(INFO) << "Resources remaining in offer " << offer.id()
                    << " : " << remaining;
@@ -382,6 +390,7 @@ public:
         }
       }
       if (!tasksToLaunch.empty()) {
+        totalSumOfTaskWaitTimes += sumOfTaskWaitTimes;
         offersAccepted++;
         totalOffersAccepted++;
         Filters filter;
