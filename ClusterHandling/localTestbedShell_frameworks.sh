@@ -33,7 +33,7 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 
 	if [ "$3" -eq "100" ]; then
 		######### LogNorm U=100%
-		if [ "$4" == "confA" ]; then
+		if [ "$4" == "ConfA" ]; then
 			## Conf__DRF-bypass
 			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.33993575760899,0.5" &
 			pid=$!
@@ -51,7 +51,7 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 			pid=$!
 			echo $pid
 
-		elif [ "$4" == "confB" ]; then
+		elif [ "$4" == "ConfB" ]; then
 			## Conf__GoogleTrace-like
 			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.42364502573483,0.5" &
 			pid=$!
@@ -75,6 +75,10 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 		fi
 
 	elif [ "$3" -eq "95" ]; then
+		if [ "$4" == "ConfB" ]; then
+			echo "configuration B not yet supported."
+			exit;
+		fi
 
 		######### LogNorm U=95%
 		## Conf_DRF-bypass
@@ -96,6 +100,11 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 
 	elif [ "$3" -eq "85" ]; then
 		######### LogNorm U=85%
+		if [ "$4" == "ConfB" ]; then
+			echo "configuration B not yet supported."
+			exit;
+		fi
+
 		## Conf_DRF-bypass
 		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.17741682811121,0.5" &
 		pid=$!
@@ -133,6 +142,10 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 		#echo $pid
 	elif [ "$3" -eq "75" ]; then
 		########## LogNorm U=75%
+		if [ "$4" == "ConfB" ]; then
+			echo "configuration B not yet supported."
+			exit;
+		fi
 
 		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.69557874121847,0.5" &
 		pid=$!
@@ -164,6 +177,10 @@ elif [ "$2" == "Exp" ]; then #--> start Exp section
 		exit
 	elif [ "$3" -eq "75" ]; then
 		########## EXP U=75%
+		if [ "$4" == "ConfB" ]; then
+			echo "configuration B not yet supported."
+			exit;
+		fi
 
 		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="Exp,96.6" &
 		pid=$!
