@@ -27,6 +27,8 @@
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
+#include <list>
+#include <time.h>
 
 #include <boost/lexical_cast.hpp>
 
@@ -110,10 +112,42 @@ uint64_t offersAccepted = 0;
 uint64_t offersUnused = 0;
 // ---
 
+class QueuedTask {
+public:
+  QueuedTask(){}
+  QueuedTask(const QueuedTask& task){
+    this->enqueueTime = task.enqueueTime;
+    this->dequeueTime = task.dequeueTime;
+  }
+
+  void setEnqueueTime(){
+    this->enqueueTime = time(nullptr);
+  }
+
+  void setDequeueTime(){
+    this->dequeueTime = time(nullptr);
+  }
+
+  void clearDequeueTime(){
+    this->dequeueTime = None();
+  }
+
+  void printWaitTime(){
+    printf("Wait time is = %.f\n",
+           difftime(this->dequeueTime.get(), this->enqueueTime.get()));
+  }
+
+private:
+  Option<time_t> enqueueTime = None();
+  Option<time_t> dequeueTime = None();
+};
+
 // mutex and thread-safe variable
 std::mutex _lock;
 uint64_t queuedTasksNumber = 0;
+std::list<QueuedTask> queuedTasks;
 // ---
+
 
 
 // Generate interarrival time (nanosecs)
@@ -132,19 +166,31 @@ uint64_t getTaskDuration()
 
 uint64_t enqueueTask() {
   _lock.lock();
+  QueuedTask queuedTask = QueuedTask();
+  queuedTask.setEnqueueTime();
+  queuedTasks.push_back(queuedTask);
   queuedTasksNumber += 1;
   _lock.unlock();
   return 1;
 }
 
-void dequeueTask() {
+Option<QueuedTask> dequeueTask() {
   _lock.lock();
-  queuedTasksNumber -= 1;
-  _lock.unlock();
+  if(queuedTasksNumber > 0) {
+    QueuedTask dequeuedTask = queuedTasks.front();
+    dequeuedTask.setDequeueTime();
+    queuedTasksNumber -= 1;
+    _lock.unlock();
+    queuedTasks.pop_front();
+    return dequeuedTask;
+  }
+  return None();
 }
 
-void reinsertTask() {
+void reinsertTask(QueuedTask taskToReinsertFront) {
   _lock.lock();
+  taskToReinsertFront.clearDequeueTime();
+  queuedTasks.push_front(taskToReinsertFront);
   queuedTasksNumber += 1;
   _lock.unlock();
 }
@@ -299,7 +345,7 @@ public:
 
       while ((lastReadQueuedTaskNumber = getQueuedTasks()) > 0
           && allocatable(remaining)) {
-        dequeueTask();
+      QueuedTask taskDequeued = dequeueTask().get();
         if (remaining.contains(TASK_RESOURCES)) {
           tasksLaunched++;
           uint64_t taskId = totalTasksLaunched++;
@@ -324,11 +370,13 @@ public:
           remaining -= resources.get();
           tasksToLaunch.push_back(task);
 
+          taskDequeued.printWaitTime();
+
           LOG(INFO) << "Resources remaining in offer " << offer.id()
                    << " : " << remaining;
         }
         else {
-          reinsertTask();
+          reinsertTask(taskDequeued);
           insufficientResources = true;
           break; // this offer is not useful anymore
         }
