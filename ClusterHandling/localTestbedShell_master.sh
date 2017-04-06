@@ -16,7 +16,8 @@ echo "LAUNCHING MASTER"
 cd $MESOS_EXECUTABLES_PATH
 
 # HEURISTICS IDs: random , maxServerLike , balancedResources
-#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=random &
+GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=random --allocation_interval=3secs &
+#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=random --allocation_interval=1secs &
 
 #GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=maxServerLike &
 
@@ -26,9 +27,10 @@ cd $MESOS_EXECUTABLES_PATH
 
 #GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=firstFitDRFH &
 
-GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFitDRFH &
+#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFitDRFH &
 
-#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFit &
+#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFit --allocation_interval=3secs &
+#GLOG_v=1 ./mesos-master.sh --work_dir=/tmp/mesos --ip=127.0.0.1 --advertise_ip=127.0.0.1 --quorum=1 --log_dir=/tmp/mesosLog --cluster_stats_file="$CLUSTER_STATS_FILEPATH" --slave_selection_heuristic=bestFit --allocation_interval=1secs &
 
 pid=$!
 echo $pid
