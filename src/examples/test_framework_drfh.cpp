@@ -119,6 +119,12 @@ double totalCpusReceived = 0.0;
 Bytes memReceived;
 Bytes totalMemReceived;
 
+double cpusUnused = 0.0;
+double totalCpusUnused = 0.0;
+Bytes memUnused;
+Bytes totalMemUnused;
+
+
 // ---
 
 class QueuedTask {
@@ -237,6 +243,8 @@ void resetStats() {
   sumOfTaskWaitTimes = 0.0;
   cpusReceived = 0.0;
   memReceived = Bytes();
+  cpusUnused = 0.0;
+  memUnused = Bytes();
 }
 
 void printStats()
@@ -250,7 +258,9 @@ void printStats()
             << "Offers accepted = "          << offersAccepted           << endl
             << "Offers unused = "            << offersUnused             << endl
             << "Cpus received = "            << cpusReceived             << endl
-            << "Mem received (MB) = "             << memReceived.megabytes();
+            << "Mem received (MB) = "        << memReceived.megabytes()  << endl
+            << "Cpus unused = "  << cpusUnused               << endl
+            << "Mem unused (MB) = "  << memUnused.megabytes()    << endl;
 }
 
 void printOnFile() {
@@ -281,7 +291,11 @@ void printOnFile() {
            << cpusReceived                               << " "
            << memReceived.megabytes()                    << " "
            << totalCpusReceived                          << " "
-           << totalMemReceived.megabytes()               << endl;
+           << totalMemReceived.megabytes()               << " "
+           << cpusUnused               << " "
+           << memUnused.megabytes()    << " "
+           << totalCpusUnused          << " "
+           << totalMemUnused.megabytes() << endl;
     myfile.close();
   }
 }
@@ -407,6 +421,10 @@ public:
           break; // this offer is not useful anymore
         }
       }
+      if(remaining.cpus().isSome())
+        cpusUnused += remaining.cpus().get();
+      if(remaining.mem().isSome())
+             memUnused += remaining.mem().get();
       if (!tasksToLaunch.empty()) {
         totalSumOfTaskWaitTimes += sumOfTaskWaitTimes;
         offersAccepted++;
@@ -436,6 +454,9 @@ public:
     totalTasksNotLaunched += tasksNotLaunched;
     totalCpusReceived += cpusReceived;
     totalMemReceived += memReceived;
+    totalCpusUnused += cpusUnused;
+    totalMemUnused += memUnused;
+
     printStats();
     printOnFile();
     resetStats();
