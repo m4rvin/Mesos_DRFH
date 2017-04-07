@@ -35,7 +35,7 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 		######### LogNorm U=100%
 		if [ "$4" == "ConfA" ]; then
 			## Conf__DRF-bypass
-			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.33993575760899,0.5" &
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.33993575760899,0.5" &
 			pid=$!
 			echo $pid
 
@@ -43,7 +43,7 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 			pid=$!
 			echo $pid
 
-			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.93328877117927,0.5" &
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.93328877117927,0.5" &
 			pid=$!
 			echo $pid
 
@@ -52,8 +52,8 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 			echo $pid
 
 		elif [ "$4" == "ConfB" ]; then
-			## Conf__GoogleTrace-like
-			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.42364502573483,0.5" &
+			## Conf_GoogleTrace-like
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.42364502573483,0.5" &
 			pid=$!
 			echo $pid
 
@@ -61,85 +61,86 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 			pid=$!
 			echo $pid
 
-			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.82974809223843,0.5" &
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.82974809223843,0.5" &
 			pid=$!
 			echo $pid
 
 			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.818147180559945,0.5" &
 			pid=$!
 			echo $pid
-
 		else
 			echo "Not recognized Configuration value."
 			exit
 		fi
 
 	elif [ "$3" -eq "95" ]; then
-		if [ "$4" == "ConfB" ]; then
-			echo "configuration B not yet supported."
-			exit;
+	######### LogNorm U=95%
+		if [ "$4" == "ConfA" ]; then
+			## Conf_DRF-bypass
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.28864246322144,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.28832302566054,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.88285791755237,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.866937344729377,0.5" &
+			pid=$!
+			echo $pid
+
+		elif [ "$4" == "ConfB" ]; then
+			## Conf_GoogleTrace-like
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.37206564923976,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.87866071235426,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.77365862558738,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.766853886172395,0.5" &
+			pid=$!
+			echo $pid
+
 		fi
-
-		######### LogNorm U=95%
-		## Conf_DRF-bypass
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.28864246322144,0.5" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.28832302566054,0.5" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.88285791755237,0.5" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.866937344729377,0.5" &
-		pid=$!
-		echo $pid
-
+		else
+			echo "Not recognized Configuration value."
+			exit
+		fi
 	elif [ "$3" -eq "85" ]; then
 		######### LogNorm U=85%
-		if [ "$4" == "ConfB" ]; then
-			echo "configuration B not yet supported."
-			exit;
+		if [ "$4" == "ConfA" ]; then
+			## Conf_DRF-bypass
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.17741682811121,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.17912373369555,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.77365862558738,0.5" &
+			pid=$!
+			echo $pid
+
+			time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.766853886172395,0.5" &
+			pid=$!
+			echo $pid;
 		fi
 
-		## Conf_DRF-bypass
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.05 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-5.17741682811121,0.5" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.17912373369555,0.5" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1.5 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-1.77365862558738,0.5" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.766853886172395,0.5" &
-		pid=$!
-		echo $pid
-
-
-		######### LogNorm U=85%
-
-		#time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="LogNormal,-4.82001088998788,0.5" &
-		#pid=$!
-		#echo $pid
-
-		#time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="LogNormal,-2.5137627892351,0.5" &
-		#pid=$!
-		#echo $pid
-
-		#time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="LogNormal,-0.0196394843421737,0.5" &
-		#pid=$!
-		#echo $pid
-
-		#time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="LogNormal,-0.866937344729377,0.5" &
-		#pid=$!
-		#echo $pid
+		else
+			echo "Not recognized Configuration value."
+			exit
+		fi
 	elif [ "$3" -eq "75" ]; then
 		########## LogNorm U=75%
 		if [ "$4" == "ConfB" ]; then
