@@ -169,42 +169,6 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 	fi
 #<-- end LogNorm section
 
-elif [ "$2" == "Exp" ]; then #--> start Exp section
-
-	if [ "$3" -eq "85" ]; then
-		########## EXP U=85%
-
-		echo "TODO 85% utilization with exp distribution."
-		exit
-	elif [ "$3" -eq "75" ]; then
-		########## EXP U=75%
-		if [ "$4" == "ConfB" ]; then
-			echo "configuration B not yet supported."
-			exit;
-		fi
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=0.1 --task_memory_demand=128MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution="Exp,96.6" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=1024MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution="Exp,9.6" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=1 --task_memory_demand=4096MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution="Exp,0.8" &
-		pid=$!
-		echo $pid
-
-		time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=10 --task_cpus_demand=4 --task_memory_demand=256MB --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution="Exp,1.8" &
-		pid=$!
-		echo $pid
-
-	else
-		echo "Not recognized utilization value."
-		exit
-	fi
-#<-- end LogNorm section
-
 else #--> start custom section
 	echo "TODO custom distribution."
 	exit
