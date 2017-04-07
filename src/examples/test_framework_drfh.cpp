@@ -113,6 +113,12 @@ uint64_t offersUnused = 0;
 
 double sumOfTaskWaitTimes = 0.0;
 double totalSumOfTaskWaitTimes = 0.0;
+
+double cpusReceived = 0.0;
+double totalCpusReceived = 0.0;
+Bytes memReceived;
+Bytes totalMemReceived;
+
 // ---
 
 class QueuedTask {
@@ -229,6 +235,8 @@ void resetStats() {
   offersAccepted  = 0;
   offersUnused    = 0;
   sumOfTaskWaitTimes = 0.0;
+  cpusReceived = 0.0;
+  memReceived = Bytes();
 }
 
 void printStats()
@@ -240,7 +248,9 @@ void printStats()
             << "Offers received= "           << receivedOffers           << endl
             << "Offers declined = "          << offersDeclined           << endl
             << "Offers accepted = "          << offersAccepted           << endl
-            << "Offers unused = "            << offersUnused;
+            << "Offers unused = "            << offersUnused             << endl
+            << "Cpus received = "            << cpusReceived             << endl
+            << "Mem received (MB) = "             << memReceived.megabytes();
 }
 
 void printOnFile() {
@@ -249,8 +259,10 @@ void printOnFile() {
 
   std::ofstream myfile;
   myfile.open (statsFilepath.get(),  std::ofstream::app);
-  if (!myfile.is_open())
-    LOG(ERROR) << "Error opening the file to ouptut stats.";
+  if (!myfile.is_open()) {
+    LOG(ERROR) << "Error opening the file to output stats.";
+    exit(EXIT_FAILURE);
+  }
   else {
     myfile << allocationRunNumber   << " "
            << receivedOffers        << " "
@@ -265,7 +277,11 @@ void printOnFile() {
            << tasksNotLaunched      << " "
            << totalTasksLaunched    << " "
            << totalTasksNotLaunched << " "
-           << totalSumOfTaskWaitTimes/totalTasksLaunched << endl;
+           << totalSumOfTaskWaitTimes/totalTasksLaunched << " "
+           << cpusReceived                               << " "
+           << memReceived.megabytes()                    << " "
+           << totalCpusReceived                          << " "
+           << totalMemReceived.megabytes()               << endl;
     myfile.close();
   }
 }
@@ -344,6 +360,8 @@ public:
                 << allocationRunNumber;
 
       Resources remaining = offer.resources();
+      cpusReceived += remaining.cpus().get();
+      memReceived += remaining.mem().get();
 
       // Launch tasks.
       vector<TaskInfo> tasksToLaunch;
@@ -416,6 +434,8 @@ public:
     }
     tasksNotLaunched = lastReadQueuedTaskNumber;
     totalTasksNotLaunched += tasksNotLaunched;
+    totalCpusReceived += cpusReceived;
+    totalMemReceived += memReceived;
     printStats();
     printOnFile();
     resetStats();
