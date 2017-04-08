@@ -104,19 +104,19 @@ else #--> start custom section
 fi
 #<-- end custom section
 
-time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWLOW_TASK_CPU_DEMAND --task_memory_demand=$TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution=$fwLow_interarrival_distribution &
+time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWLOW_TASK_CPU_DEMAND --task_memory_demand=$FWLOW_TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-1.dat " --generators_seed="framework-low" --interarrivals_distribution=$fwLow_interarrival_distribution &
 pid=$!
 echo $pid
 
-time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWCOMMON_TASK_CPU_DEMAND --task_memory_demand=$TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution=$fwCommon_interarrival_distribution &
+time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWCOMMON_TASK_CPU_DEMAND --task_memory_demand=$FWCOMMON_TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-2.dat " --generators_seed="framework-common" --interarrivals_distribution=$fwCommon_interarrival_distribution &
 pid=$!
 echo $pid
 
-time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWMEMINT_TASK_CPU_DEMAND --task_memory_demand=$TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution=$fwMemInt_interarrival_distribution &
+time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWMEMINT_TASK_CPU_DEMAND --task_memory_demand=$FWMEMINT_TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-3.dat " --generators_seed="framework-memint" --interarrivals_distribution=$fwMemInt_interarrival_distribution &
 pid=$!
 echo $pid
 
-time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWCPUINT_TASK_CPU_DEMAND --task_memory_demand=$TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution=$fwCpuInt_interarrival_distribution &
+time ./test-framework-drfh --master=127.0.0.1:5050 --task_duration=$TASK_DURATION --task_cpus_demand=$FWCPUINT_TASK_CPU_DEMAND --task_memory_demand=$FWCPUINT_TASK_MEM_DEMAND --duration=$fwDuration --offers_stats_file="$FRAMEWORK_STATS_FOLDER/framework-4.dat " --generators_seed="framework-cpuint" --interarrivals_distribution=$fwCpuInt_interarrival_distribution &
 pid=$!
 echo $pid
 
