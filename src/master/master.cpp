@@ -4507,7 +4507,7 @@ void Master::_accept(
     // Otherwise you cannot meanTaskDemand could be lower than your actual
     // demand simply because there was no space in the offer.
     // (the probability it was so small to fill the remaining space is very low
-    if (checkTaskFitting(meanTaskDemand, offeredResources)) {
+    if (!checkTaskFitting(meanTaskDemand, offeredResources)) {
       LOG(INFO) << "Forcing meanFrameworDemand to be increased because we "
           "cannot estimate actual meanTaskDemand";
        allocator->updateMeanFrameworkDemand(frameworkId, meanTaskDemand, true);
