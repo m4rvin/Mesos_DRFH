@@ -1590,10 +1590,22 @@ void HierarchicalAllocatorProcess::updateMeanFrameworkDemand(
 
     if (!force)
       frameworks[frameworkId].totalConsumed += demand;
-    else
+    else{
       // Forcing meanFrameworkDemand to use the double of demand received.
       // if passing here then totalConsumed will not be consistent anymore.
-      frameworks[frameworkId].totalConsumed += demand + demand;
+      if (frameworks[frameworkId].totalOffersAccepted == 0)
+        frameworks[frameworkId].totalConsumed += demand + demand;
+      else {
+        double multiplier =
+            static_cast<double>((frameworks[frameworkId].totalOffersAccepted
+                + 2.0))/frameworks[frameworkId].totalOffersAccepted;
+
+        // Implicit multiplication
+        for (int i = 0; i < ceil(multiplier); i++)
+          frameworks[frameworkId].totalConsumed +=
+              frameworks[frameworkId].totalConsumed;
+      }
+    }
 
     frameworks[frameworkId].totalOffersAccepted++;
 
