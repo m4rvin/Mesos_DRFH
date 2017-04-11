@@ -90,10 +90,17 @@ if [ "$2" == "LogNorm" ]; then #->> start LogNorm section
 			fwCommon_interarrival_distribution="LogNormal,-2.17912373369555,0.5"
 			fwMemInt_interarrival_distribution="LogNormal,-1.77365862558738,0.5"
 			fwCpuInt_interarrival_distribution="LogNormal,-0.766853886172395,0.5"
+		elif [ "$4" == "ConfB" ]; then
+			## Conf_GoogleTrace-like V1
+			fwLow_interarrival_distribution="LogNormal,-4.26016655674236,0.5"
+			fwCommon_interarrival_distribution="LogNormal,-2.76405732961526,0.5"
+			fwMemInt_interarrival_distribution="LogNormal,-1.65105630349505,0.5"
+			fwCpuInt_interarrival_distribution="LogNormal,-0.65562825106217,0.5"
 		else
 			echo "Not recognized Configuration value."
 			exit
 		fi
+
 	else
 		echo "Not recognized utilization value."
 		exit
